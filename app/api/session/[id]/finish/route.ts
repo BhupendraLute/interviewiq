@@ -5,7 +5,39 @@ import { eq, asc } from "drizzle-orm";
 import { runAgentWithFallback } from "@/lib/agents/runWithFallback";
 import { makeFeedbackAgent, FeedbackReport } from "@/lib/agents/feedbackAgent";
 
-// POST /api/session/[id]/finish
+// GET /api/session/[id]/finish — fetch existing report
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id: sessionId } = await params;
+    const db = getDb();
+
+    const [report] = await db
+      .select()
+      .from(feedbackReports)
+      .where(eq(feedbackReports.sessionId, sessionId))
+      .limit(1);
+
+    if (!report) {
+      return NextResponse.json({ ok: false, error: "Report not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      report: {
+        correctnessNotes: report.correctnessNotes,
+        complexityNotes: report.complexityNotes,
+        communicationNotes: report.communicationNotes,
+        quotedMoments: report.quotedMoments,
+        nextSteps: report.nextSteps,
+      },
+    });
+  } catch (err: any) {
+    console.error("[finish GET] failed:", err);
+    return NextResponse.json({ ok: false, error: err.message ?? "Unknown error" }, { status: 500 });
+  }
+}
+
+// POST /api/session/[id]/finish — complete session and generate report
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id: sessionId } = await params;

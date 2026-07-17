@@ -22,27 +22,32 @@ First visit? You get a UUID cookie automatically.
 This tracks your progress & sessions. No personal data collected.
 ```
 
-### 2. Select Your Interview Parameters
+### 2. Choose Your Interview Type
 
-You'll see a form with:
+You'll see a landing page with features. Click **"Start Free Interview"** to begin.
 
-- **Role**: Backend Engineer, Frontend Engineer, etc.
-- **Difficulty**: Easy, Medium, or Hard
+On the **Create Interview** page, you select:
 
-**Recommendation**: Start with Easy if you're new. Build to Medium/Hard as you get stronger.
+- **Interview Type**: Technical (DSA) | Behavioral | System Design
+- **Job Role**: Free text (e.g., "Frontend Developer")
+- **Difficulty**: Easy | Medium | Hard
+- **Duration**: 15 | 30 | 45 | 60 minutes
+
+**Recommendation**: Start with Technical / Easy if you're new to DSA. Build to Medium/Hard as you get stronger.
 
 ### 3. Click "Start Interview"
 
-You'll see:
-- The question prompt
-- A chat interface below
-- A timer (typically 30 minutes max)
+You'll navigate to the interview page with:
+- A question prompt
+- A text area for your response
+- A timer (countdown based on your chosen duration)
+- Navigation between questions
 
 ---
 
 ## During the Interview
 
-### The Interview Flow
+### The Interview Flow (Technical / DSA)
 
 ```
 1. You see a DSA question
@@ -50,20 +55,30 @@ You'll see:
 3. You type your answer in the chat
 4. The interviewer asks a follow-up question
 5. You respond
-6. Repeat 4-5 until the interviewer seems satisfied
-   OR you feel confident to move to code
-7. You share code when ready
-8. Follow-ups on complexity, edge cases, etc.
-9. When done, click "End Interview"
+6. Repeat 4-5
+7. When done, click "End Interview"
 ```
+
+### Behavioral Interview Tips
+
+- Use the **STAR method**: Situation, Task, Action, Result
+- Be specific: name the project, your role, the outcome
+- The interviewer will probe for concrete details
+
+### System Design Interview Tips
+
+- Start with requirements and constraints
+- Identify core components and data flow
+- Discuss tradeoffs: consistency vs availability, latency vs throughput
+- The interviewer will ask about scaling and bottlenecks
 
 ### Tips for Strong Performance
 
 #### Before You Answer
 
 - **Don't rush**: Take 30 seconds to think through the problem.
-- **Clarify constraints**: "Are there duplicates?" "Can input be negative?" (the interviewer may prompt you.)
-- **State complexity goals**: "I'm aiming for O(n) time, O(1) space."
+- **Clarify constraints**: "Are there duplicates?" "Can input be negative?"
+- **State complexity goals** (for DSA): "I'm aiming for O(n) time, O(1) space."
 
 #### When Answering
 
@@ -73,81 +88,41 @@ You'll see:
 
 #### When Code is Ready
 
-- **Paste clearly**: Use code blocks or plain text, not screenshots.
+- **Paste clearly**: Use code blocks or plain text.
 - **Mention edge cases**: "I'm handling empty input with an early return."
-- **Don't over-comment**: Code should speak for itself; use comments only for non-obvious logic.
+- **The agent auto-detects code** and shifts its follow-ups accordingly
 
 #### If the Interviewer Challenges You
 
-- **Don't get defensive**: They're testing your flexibility, not attacking your intelligence.
-- **Think out loud**: "You're right, let me reconsider..." shows humility and adaptability.
+- **Don't get defensive**: They're testing your flexibility.
+- **Think out loud**: "You're right, let me reconsider..."
 - **Pivot if wrong**: "My first approach was O(n²) — I should use a hash map instead."
 
 ---
 
 ## What the Interviewer is Looking For
 
-### Real Interviewer Behavior
+The interviewer on InterviewIQ is **not scripted**. It reads your actual answer and asks **real follow-ups**:
 
-The interviewer on InterviewIQ is **not scripted**. It reads your actual answer and asks **real follow-ups** based on what you wrote:
+- Coding: "You said O(n) — walk me through your loop complexity."
+- System Design: "How would that cache layer handle a 10x traffic spike?"
+- Behavioral: "What was the measurable outcome of that decision?"
 
-- ✓ "You said O(n) — walk me through why your loop is O(n) and not O(n²)."
-- ✓ "What happens if the input is an empty array?"
-- ✗ "Tell me about your favorite data structure." (too generic)
-
-### The `flag_weakness` Tool
-
-Behind the scenes, when the interviewer spots a **concrete gap**, it flags it:
-
-- "Time complexity" — you claimed O(n) but wrote O(n²)
-- "Edge case: null input" — no null check before accessing array
-- "Off-by-one error" — loop condition is wrong
-
-These flags feed into your final feedback report.
+The agent uses the `flag_weakness` tool to log concrete gaps it spots. These are collected in-memory during the interview but currently not persisted to the final report.
 
 ---
 
 ## After the Interview: Feedback
 
-When you click "End Interview":
+When you click "Submit Interview", you navigate to the **Report** page showing:
 
-1. The system processes your full transcript
-2. A feedback agent generates a structured report
-3. You see:
+- **Score** (0-100)
+- **Strong Areas** and **Areas to Improve**
+- **Skill Breakdown** (BarChart)
+- **Performance Overview** (RadarChart)
+- **Detailed feedback text**
 
-   - **Score** (1-10)
-   - **Strengths** (with quotes from your actual words)
-   - **Weaknesses** (flagged gaps + analysis)
-   - **Recommendations** (what to practice next)
-
-### Reading Your Report
-
-```json
-{
-  "score": 7,
-  "strengths": [
-    "Quickly identified the hash map approach",
-    "Explained time complexity clearly"
-  ],
-  "weaknesses": [
-    "Missed space complexity analysis",
-    "No edge case for null input"
-  ],
-  "recommendations": [
-    "Always state both time AND space complexity upfront",
-    "Before coding, ask 'what are the edge cases?'",
-    "Add null checks and bounds validation as a habit"
-  ]
-}
-```
-
-### What This Means
-
-- **Score 1-3**: Major gaps; review fundamentals
-- **Score 4-5**: Solid approach; needs refinement
-- **Score 6-7**: Good work; close to interview-ready
-- **Score 8-9**: Strong; ready for real interviews
-- **Score 10**: Excellent; no concerns
+> Note: The report page currently shows example data. Full integration with the API-driven feedback is in progress.
 
 ---
 
@@ -178,7 +153,6 @@ When you click "End Interview":
 ### "The interviewer's response seems wrong"
 
 The interviewer is an AI. It makes mistakes sometimes. If the follow-up doesn't make sense:
-- Take it as a learning moment (real interviewers make mistakes too!)
 - Politely clarify: "I think I explained that already. Let me restate..."
 - Move forward; your final feedback report will be more accurate
 
@@ -190,13 +164,13 @@ The interviewer is an AI. It makes mistakes sometimes. If the follow-up doesn't 
 
 ### "I ran out of time"
 
-- Interviews have a max duration (default 30 min)
-- You can always start a new interview with a different question
+- The timer depends on your chosen duration
+- You can always start a new interview
 - No penalty for incomplete interviews
 
 ### "I want to retake the same question"
 
-Yes! You can pick the same question, role, and difficulty again. Your new session is tracked separately, so you can see your improvement.
+Yes! You can pick the same question, role, and difficulty again. Your new session is tracked separately.
 
 ---
 
@@ -204,26 +178,19 @@ Yes! You can pick the same question, role, and difficulty again. Your new sessio
 
 ### After Each Interview
 
-1. Read your feedback carefully
-2. Pick ONE recommendation to focus on
-3. Research that topic (leetcode, system design resources)
-4. Retake a similar question in a week
-
-### Questions to Track
-
-- Easy: 3-5 perfect scores before moving up
-- Medium: 6-7 scores consistently
-- Hard: Only after strong medium performance
+1. Review your feedback carefully
+2. Pick ONE area to focus on
+3. Practice that topic
+4. Retake a similar interview in a week
 
 ### Build a Habit
 
 - Interview 1-2x per week
-- Mix difficulties (don't only do easy)
-- Focus on communication, not just code
+- Mix interview types (coding, system design, behavioral)
+- Focus on communication, not just getting the right answer
 
 ---
 
 ## Still Have Questions?
 
 - **GitHub Issues**: [repo link]
-- **Email**: support@interviewiq.example.com

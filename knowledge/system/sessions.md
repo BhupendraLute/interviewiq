@@ -36,6 +36,7 @@ A **session** in InterviewIQ represents one complete mock interview from start t
        ▼
 ┌──────────────────────────────────────┐
 │  FINISH INTERVIEW                    │
+│  • Session status → "completed"      │
 │  • Feedback agent reads transcript   │
 │  • Structured report generated       │
 │  • Session marked complete           │
@@ -48,98 +49,93 @@ A **session** in InterviewIQ represents one complete mock interview from start t
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID (PK) | Session ID (linked to transcript/feedback) |
-| `anonId` | UUID (FK) | Anonymous user ID (from cookie) |
-| `questionId` | String | Reference to question from question bank |
-| `role` | String | e.g., "backend engineer", "frontend engineer" |
-| `difficulty` | String | "easy" \| "medium" \| "hard" |
-| `createdAt` | DateTime | Interview start time |
-| `finishedAt` | DateTime \| Null | Interview end time (null if in progress) |
-| `provider` | String | "openai" \| "openrouter" (which model served the interview) |
+| `id` | UUID (PK) | Auto-generated session ID |
+| `sessionId` | Text | Anonymous user UUID from client cookie (not a FK — plain text) |
+| `role` | Text | e.g., "SDE-2 Backend", "Frontend Engineer" |
+| `difficulty` | Text | "easy" \| "medium" \| "hard" |
+| `status` | Text | "in_progress" \| "completed" |
+| `createdAt` | DateTime (tz) | Interview start time (auto-default now) |
 
-### `transcript` Table
+### `transcript_events` Table
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID (PK) | Message ID |
-| `sessionId` | UUID (FK) | Parent session |
-| `role` | String | "user" \| "interviewer" |
-| `message` | Text | The actual message content |
-| `timestamp` | DateTime | When this message was sent |
-| `flaggedWeaknesses` | JSON[] | Weaknesses flagged by agent on interviewer turn |
+| `id` | UUID (PK) | Auto-generated event ID |
+| `sessionId` | UUID (FK → sessions.id) | Parent session (cascade delete) |
+| `role` | Text | "ai" \| "user" |
+| `content` | Text | The actual message content |
+| `createdAt` | DateTime (tz) | When this event was created (auto-default now) |
 
-**Example flaggedWeaknesses**:
+Note: flagged weaknesses are NOT stored in the database. They are collected in-memory during the respond request lifecycle and returned to the client, but not persisted between requests. The feedback agent receives only the transcript text without explicit weakness flags.
+
+### `feedback_reports` Table
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID (PK) | Auto-generated report ID |
+| `sessionId` | UUID (FK → sessions.id) | Parent session (cascade delete) |
+| `correctnessNotes` | Text | Assessment of solution correctness |
+| `complexityNotes` | Text | Assessment of time/space complexity awareness |
+| `communicationNotes` | Text | Assessment of communication clarity |
+| `quotedMoments` | JSONB | Array of `{speaker, quote, why}` objects (2-4 moments) |
+| `nextSteps` | Text | Actionable next steps for the candidate |
+| `createdAt` | DateTime (tz) | When feedback was generated (auto-default now) |
+
+**Example quotedMoments**:
 ```json
 [
-  { "topic": "time complexity", "note": "Claimed O(n) but wrote O(n²)" },
-  { "topic": "edge case: empty array", "note": "No null check before accessing [0]" }
+  { "speaker": "user", "quote": "I'd use a hash map to store seen numbers", "why": "Correctly identified optimal data structure" },
+  { "speaker": "ai", "quote": "What about space complexity?", "why": "Interviewer prompted for missing analysis" }
 ]
-```
-
-### `feedback` Table
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | UUID (PK) | Feedback report ID |
-| `sessionId` | UUID (FK) | Parent session |
-| `report` | JSON | Structured feedback (Zod-validated schema) |
-| `createdAt` | DateTime | When feedback was generated |
-
-**Report Schema** (Zod structure):
-```typescript
-{
-  score: number,                    // 1-10 overall score
-  strengths: string[],              // Specific strong moments with quotes
-  weaknesses: string[],             // Specific gaps from flagged_weakness calls
-  recommendations: string[],        // Next steps for improvement
-  codeQuality: string,              // Notes on submitted code
-  communicationQuality: string      // How well they explained approach
-}
 ```
 
 ## Session Queries
 
 ### 1. Create New Session
 
-```sql
-INSERT INTO sessions (id, anonId, questionId, role, difficulty, createdAt)
-VALUES (uuid(), $anonId, $questionId, $role, $difficulty, now())
-RETURNING *;
+```typescript
+await db.insert(sessions).values({ sessionId: anonId, role, difficulty }).returning();
+// Also inserts the initial question prompt as a transcript event:
+await db.insert(transcriptEvents).values({ sessionId, role: "ai", content: question.prompt });
 ```
 
 ### 2. Get Session
 
-```sql
-SELECT * FROM sessions WHERE id = $sessionId;
+```typescript
+await db.select().from(sessions).where(eq(sessions.id, sessionId));
 ```
 
 ### 3. Get Transcript for Session
 
-```sql
-SELECT * FROM transcript 
-WHERE sessionId = $sessionId
-ORDER BY timestamp ASC;
+```typescript
+await db.select()
+  .from(transcriptEvents)
+  .where(eq(transcriptEvents.sessionId, sessionId))
+  .orderBy(asc(transcriptEvents.createdAt));
 ```
 
 ### 4. Add Message to Transcript
 
-```sql
-INSERT INTO transcript (id, sessionId, role, message, timestamp, flaggedWeaknesses)
-VALUES (uuid(), $sessionId, $role, $message, now(), $flaggedWeaknesses);
+```typescript
+await db.insert(transcriptEvents).values({ sessionId, role: "user", content: message });
 ```
 
 ### 5. Get Feedback for Session
 
-```sql
-SELECT * FROM feedback WHERE sessionId = $sessionId;
+```typescript
+await db.select().from(feedbackReports).where(eq(feedbackReports.sessionId, sessionId));
 ```
 
-### 6. List All Sessions for Anonymous User
+### 6. Mark Session as Completed
 
-```sql
-SELECT * FROM sessions 
-WHERE anonId = $anonId
-ORDER BY createdAt DESC;
+```typescript
+await db.update(sessions).set({ status: "completed" }).where(eq(sessions.id, sessionId));
+```
+
+### 7. List All Sessions for Anonymous User
+
+```typescript
+await db.select().from(sessions).where(eq(sessions.sessionId, anonId)).orderBy(desc(sessions.createdAt));
 ```
 
 ## Anonymous Identity Model
@@ -152,6 +148,7 @@ ORDER BY createdAt DESC;
 - **HttpOnly**: True (not accessible to JavaScript)
 - **SameSite**: Lax (CSRF protection)
 - **Secure**: True in production
+- **Path**: /
 
 ### First Visit Flow
 
@@ -159,9 +156,8 @@ ORDER BY createdAt DESC;
 GET / (no iq_session cookie)
   │
   ├─> getOrCreateAnonId() called
-  ├─> Generate UUID
+  ├─> Generate UUID via crypto.randomUUID()
   ├─> Set httpOnly cookie
-  ├─> INSERT into anon_users table (optional, for tracking)
   └─> Return to user with cookie set
 ```
 
@@ -181,21 +177,22 @@ GET / (iq_session cookie present)
 - **No Tracking**: Cookie is the only tracking mechanism
 - **Session Lifetime**: Sessions stored indefinitely (no auto-deletion)
 - **Cookie Lifetime**: 1 year, then refreshes on next visit
-- **GDPR Compliant**: Anonymous, no personal data to comply with
+- **GDPR Compliant**: Anonymous, no personal data to collect
 
 ## Typical Session Sizes
 
 | Metric | Typical Value |
 |--------|---------------|
-| Interview Duration | 15–30 minutes |
-| Messages per Interview | 8–15 (4–7 user turns) |
+| Interview Duration | 3–30 minutes (varies by timer preset) |
+| Messages per Interview | 6–20 (3–10 user turns) |
 | Transcript Size | 2–5 KB |
 | Feedback Report | 1–2 KB |
 | Total Session Storage | ~10 KB |
 
 ## Performance Considerations
 
-- **Indexes**: On `sessionId`, `anonId`, `createdAt`
-- **Query Patterns**: Mostly append-only (new messages, new sessions)
+- **Indexes**: On `sessions.sessionId`, `transcriptEvents.sessionId`, `feedbackReports.sessionId`
+- **Query Patterns**: Mostly append-only (new events, new sessions)
 - **Latency**: Sub-100ms for session retrieval (Neon serverless HTTP)
 - **Scalability**: No connection pooling needed; each request is stateless
+- **Lazy DB initialization**: `getDb()` is called at request time, not module load time, to avoid crash on `next build` before DATABASE_URL is set

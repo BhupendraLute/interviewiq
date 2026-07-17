@@ -159,6 +159,24 @@ const reverseList = (head) => {
 
 ---
 
+## Importing Custom Questions
+
+InterviewIQ supports importing your own questions via CSV or JSON at API request time:
+
+```csv
+title,prompt,difficulty,topic
+"FizzBuzz","Write a function that prints numbers 1-100...","easy","arrays"
+"Palindrome Check","Check if a string is a palindrome...","easy","strings"
+```
+
+```json
+[
+  { "title": "FizzBuzz", "prompt": "Write a function...", "difficulty": "easy", "topic": "arrays" }
+]
+```
+
+Pass the `questions` field to `POST /api/session/start`.
+
 ## Difficulty Notes
 
 These questions should be solved in **5–10 minutes** by someone familiar with the core concepts. They're designed to build confidence, not stump.

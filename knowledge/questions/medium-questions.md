@@ -4,7 +4,7 @@ description: Medium difficulty DSA questions for mock interviews
 topic: questions
 subtopic: medium
 difficulty: medium
-count: 3
+count: 4
 source_file: lib/questions.ts
 updated: 2026-07-17
 ---
@@ -189,6 +189,55 @@ const numIslands = (grid) => {
 1. Can you do it with BFS instead of DFS?
 2. What's the space complexity?
 3. How would you modify it to track island sizes?
+
+---
+
+## Question 4: Coin Change
+
+### Prompt
+
+> Given a set of coin denominations and a target amount, how would you find the fewest number of coins needed to make that amount?
+
+### Key Concepts
+
+- Dynamic programming
+- Bottom-up memoization
+- Optimization problems
+
+### Optimal Solution
+
+**Time**: O(amount × coins)
+**Space**: O(amount)
+
+```javascript
+const coinChange = (coins, amount) => {
+  const dp = new Array(amount + 1).fill(Infinity);
+  dp[0] = 0;
+  
+  for (let i = 1; i <= amount; i++) {
+    for (const coin of coins) {
+      if (coin <= i) {
+        dp[i] = Math.min(dp[i], dp[i - coin] + 1);
+      }
+    }
+  }
+  
+  return dp[amount] === Infinity ? -1 : dp[amount];
+};
+```
+
+### Common Mistakes
+
+- Using greedy instead of DP (greedy fails on non-canonical systems)
+- Not handling the impossible case (return -1)
+- Off-by-one in DP array initialization
+- Wrong iteration order (coins loop vs amount loop)
+
+### Follow-up Questions
+
+1. Can greedy ever work? When?
+2. How would you return the actual coin combination, not just count?
+3. What if you have an unlimited supply? Limited supply?
 
 ---
 

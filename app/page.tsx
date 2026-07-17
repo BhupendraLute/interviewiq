@@ -1,420 +1,177 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent } from "react";
-import { normalizeImportedQuestions } from "@/lib/questions";
-import type { Question } from "@/lib/questions";
-import { getInterviewModeLabel, scoreAnswer, type InterviewMode } from "@/lib/interviewScoring";
-import { buildProgressiveHint } from "@/lib/hints";
-import { formatTime, getTimerConfig, getTimerPresetLabel, type TimerPreset } from "@/lib/timedMode";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Brain, ChartBar, Clock, Lightbulb, ShieldCheck, Goal } from "lucide-react";
 
-type View = "setup" | "interview" | "feedback";
-
-type TranscriptItem = { role: "ai" | "user"; content: string };
-
-type FeedbackReport = {
-  correctnessNotes: string;
-  complexityNotes: string;
-  communicationNotes: string;
-  quotedMoments: { speaker: "user" | "ai"; quote: string; why: string }[];
-  nextSteps: string;
-};
-
-const ROLES = ["SDE-1 Frontend", "SDE-2 Backend", "SDE-2 Full Stack"];
-const DIFFICULTIES = ["easy", "medium", "hard"] as const;
-const MODES: InterviewMode[] = ["coding", "system-design", "behavioral"];
-const TIMER_PRESETS: TimerPreset[] = ["short", "medium", "long"];
-
-export default function Home() {
-  const [view, setView] = useState<View>("setup");
-  const [role, setRole] = useState(ROLES[1]);
-  const [difficulty, setDifficulty] = useState<(typeof DIFFICULTIES)[number]>("medium");
-  const [mode, setMode] = useState<InterviewMode>("coding");
-
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
-  const [answer, setAnswer] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [report, setReport] = useState<FeedbackReport | null>(null);
-  const [importedQuestions, setImportedQuestions] = useState<Question[] | null>(null);
-  const [importMessage, setImportMessage] = useState<string | null>(null);
-  const [currentScore, setCurrentScore] = useState<number | null>(null);
-  const [scoreSummary, setScoreSummary] = useState<string | null>(null);
-  const [hintLevel, setHintLevel] = useState(1);
-  const [hintMessage, setHintMessage] = useState<string | null>(null);
-  const [timerPreset, setTimerPreset] = useState<TimerPreset>("medium");
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
-
-  async function startInterview() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/session/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, difficulty, questions: importedQuestions ?? undefined }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Failed to start interview");
-
-      setSessionId(data.sessionId);
-      setTranscript([{ role: "ai", content: data.question.prompt }]);
-      setCurrentScore(null);
-      setScoreSummary(null);
-      setHintLevel(1);
-      setHintMessage(null);
-      const timer = getTimerConfig(timerPreset);
-      setTimeLeft(timer.seconds);
-      setView("interview");
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function submitAnswer(text: string) {
-    if (!sessionId || !text.trim()) return;
-    setLoading(true);
-    setError(null);
-    setTranscript((t) => [...t, { role: "user", content: text }]);
-    setAnswer("");
-    try {
-      const res = await fetch(`/api/session/${sessionId}/respond`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, mode }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Failed to get a response");
-      const score = scoreAnswer(text, mode);
-      setCurrentScore(score.score);
-      setScoreSummary(`${score.summary} Focus: ${score.focusAreas.join("; ")}`);
-      setTranscript((t) => [...t, { role: "ai", content: data.reply }]);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function finishInterview() {
-    if (!sessionId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/session/${sessionId}/finish`, { method: "POST" });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Failed to generate feedback");
-      setReport(data.report);
-      setView("feedback");
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function startOver() {
-    setSessionId(null);
-    setTranscript([]);
-    setAnswer("");
-    setReport(null);
-    setError(null);
-    setCurrentScore(null);
-    setScoreSummary(null);
-    setHintLevel(1);
-    setHintMessage(null);
-    setTimeLeft(null);
-    setView("setup");
-  }
-
-  function requestHint() {
-    if (!transcript[0]?.content) return;
-
-    const currentAnswer = transcript.filter((item) => item.role === "user").slice(-1)[0]?.content ?? answer;
-    const prompt = transcript[0].content;
-    const nextHint = buildProgressiveHint({
-      prompt,
-      answer: currentAnswer,
-      mode,
-      hintLevel,
-    });
-
-    setHintLevel((value) => value + 1);
-    setHintMessage(nextHint);
-  }
+export default function HomePage() {
+  const [year, setYear] = useState(2026);
 
   useEffect(() => {
-    if (view !== "interview" || timeLeft === null) return;
-
-    if (timeLeft === 0) {
-      setError("Time is up. You can finish the interview or submit one last response.");
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      setTimeLeft((current) => {
-        if (current === null || current <= 1) {
-          window.clearInterval(interval);
-          return 0;
-        }
-        return current - 1;
-      });
-    }, 1000);
-
-    return () => window.clearInterval(interval);
-  }, [view, timeLeft]);
-
-  async function handleQuestionFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const questions = normalizeImportedQuestions(text);
-      setImportedQuestions(questions);
-      setImportMessage(`Loaded ${questions.length} questions from ${file.name}.`);
-      setError(null);
-    } catch (e: any) {
-      setImportedQuestions(null);
-      setImportMessage(null);
-      setError(e.message || "Failed to read the question file.");
-    }
-  }
+    setYear(new Date().getFullYear());
+  }, []);
+  const features = [
+    {
+      icon: <Brain className="h-8 w-8 text-blue-600" />,
+      title: "AI-Powered Feedback",
+      description: "Get instant, detailed feedback on your responses to improve your skills.",
+    },
+    {
+      icon: <ChartBar className="h-8 w-8 text-blue-600" />,
+      title: "Performance Analytics",
+      description: "Track your progress with detailed reports and visual analytics.",
+    },
+    {
+      icon: <Clock className="h-8 w-8 text-blue-600" />,
+      title: "Realistic Timers",
+      description: "Practice under real interview conditions with timed questions.",
+    },
+    {
+      icon: <Lightbulb className="h-8 w-8 text-blue-600" />,
+      title: "Question Bank",
+      description: "Access a vast library of interview questions across multiple domains.",
+    },
+    {
+      icon: <ShieldCheck className="h-8 w-8 text-blue-600" />,
+      title: "Privacy Focused",
+      description: "Your data is secure and never shared with third parties.",
+    },
+    {
+      icon: <Goal className="h-8 w-8 text-blue-600" />,
+      title: "Goal Tracking",
+      description: "Set goals and track your improvement over time.",
+    },
+  ];
 
   return (
-    <main className="flex-1 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-2xl">
-        <header className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold text-slate-900">InterviewIQ</h1>
-          <p className="text-slate-500 mt-1">Free AI mock interviews. No signup.</p>
-        </header>
-
-        {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
+    <div className="flex-1 flex flex-col bg-gray-50">
+      {/* Hero Section */}
+      <section className="px-4 py-20 lg:py-0 min-h-[calc(100vh-64px)] flex items-center">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center w-full">
+          <div className="text-center lg:text-left">
+            <h1 className="text-4xl lg:text-5xl font-bold mb-6 text-gray-900">
+              Ace Your Next Interview with AI
+            </h1>
+            <p className="text-lg lg:text-xl text-gray-600 mb-8 max-w-lg mx-auto lg:mx-0">
+              Practice real-world interview questions, get instant feedback, and improve your skills with our AI-powered platform.
+            </p>
+            <Link href="/interview/create">
+              <Button variant="default" size="lg">
+                Start Free Interview
+              </Button>
+            </Link>
           </div>
-        )}
-
-        {view === "setup" && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                >
-                  {ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Difficulty</label>
-                <select
-                  value={difficulty}
-                  onChange={(e) => setDifficulty(e.target.value as any)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                >
-                  {DIFFICULTIES.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Interview mode</label>
-                <select
-                  value={mode}
-                  onChange={(e) => setMode(e.target.value as InterviewMode)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                >
-                  {MODES.map((m) => (
-                    <option key={m} value={m}>
-                      {getInterviewModeLabel(m)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Time limit</label>
-                <select
-                  value={timerPreset}
-                  onChange={(e) => setTimerPreset(e.target.value as TimerPreset)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                >
-                  {TIMER_PRESETS.map((preset) => (
-                    <option key={preset} value={preset}>
-                      {getTimerPresetLabel(preset)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Import question pack (JSON or CSV)
-                </label>
-                <input
-                  type="file"
-                  accept="application/json,.json,text/csv,.csv"
-                  onChange={handleQuestionFileChange}
-                  className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-full file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white"
-                />
-                {importMessage && <p className="mt-2 text-sm text-emerald-600">{importMessage}</p>}
-                {importedQuestions && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setImportedQuestions(null);
-                      setImportMessage("Using the built-in question bank.");
-                    }}
-                    className="mt-2 text-sm text-slate-600 underline"
-                  >
-                    Use built-in questions instead
-                  </button>
-                )}
-              </div>
-
-              <button
-                onClick={startInterview}
-                disabled={loading}
-                className="w-full rounded-lg bg-slate-900 text-white py-2.5 text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
-              >
-                {loading ? "Starting..." : "Start interview"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {view === "interview" && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="space-y-4 max-h-96 overflow-y-auto mb-4">
-              {transcript.map((item, i) => (
-                <div
-                  key={i}
-                  className={`rounded-lg px-4 py-3 text-sm ${
-                    item.role === "ai"
-                      ? "bg-slate-100 text-slate-800"
-                      : "bg-slate-900 text-white ml-8"
-                  }`}
-                >
-                  {item.content}
-                </div>
-              ))}
-              {loading && <div className="text-sm text-slate-400">Thinking...</div>}
-            </div>
-
-            <textarea
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              placeholder="Type your approach or code here..."
-              rows={5}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono"
+          <div className="flex justify-center">
+            <img
+              src="/hero-image.png"
+              alt="Interview preparation with AI"
+              className="rounded-lg shadow-xl max-w-full h-auto"
             />
+          </div>
+        </div>
+      </section>
 
-            {currentScore !== null && (
-              <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-slate-800">Current score</p>
-                  <span className="text-sm font-medium text-slate-700">{currentScore}/100</span>
+      {/* Features Section */}
+      <section className="px-4 py-20 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">Why Choose InterviewIQ?</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {features.map((feature, index) => (
+              <div key={index} className="bg-gray-50 p-6 rounded-lg shadow-sm text-center">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+                  {feature.icon}
                 </div>
-                {scoreSummary && <p className="mt-1 text-sm text-slate-600">{scoreSummary}</p>}
+                <h3 className="text-xl font-semibold mb-2 text-gray-900">{feature.title}</h3>
+                <p className="text-gray-600">{feature.description}</p>
               </div>
-            )}
+            ))}
+          </div>
+        </div>
+      </section>
 
-            {timeLeft !== null && (
-              <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                <span className="font-semibold">Time left:</span> {formatTime(timeLeft)}
-              </div>
-            )}
-
-            {hintMessage && (
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                {hintMessage}
-              </div>
-            )}
-
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={() => submitAnswer(answer)}
-                disabled={loading || !answer.trim()}
-                className="flex-1 rounded-lg bg-slate-900 text-white py-2.5 text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
-              >
-                Submit
-              </button>
-              <button
-                onClick={requestHint}
-                disabled={loading || hintLevel > 3}
-                className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
-              >
-                {hintLevel > 3 ? "Hints used" : `Hint ${hintLevel}`}
-              </button>
+      {/* Testimonials Section */}
+      <section className="px-4 py-20">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">What Our Users Say</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <p className="text-gray-700 italic mb-4">
+                "InterviewIQ helped me land my dream job at FAANG! The AI feedback was incredibly detailed and helped me improve my responses."
+              </p>
+              <p className="font-medium text-gray-900">— Sarah K., Software Engineer</p>
             </div>
-
-            {transcript.length >= 3 && (
-              <button
-                onClick={finishInterview}
-                disabled={loading}
-                className="w-full mt-3 rounded-lg border border-slate-900 text-slate-900 py-2.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
-              >
-                Finish interview
-              </button>
-            )}
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <p className="text-gray-700 italic mb-4">
+                "I was able to practice realistic interview scenarios and get instant feedback. My confidence improved significantly in just a week."
+              </p>
+              <p className="font-medium text-gray-900">— James T., Data Scientist</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <p className="text-gray-700 italic mb-4">
+                "The performance analytics helped me identify my weak areas. I focused on improving them and aced my next interview."
+              </p>
+              <p className="font-medium text-gray-900">— Priya M., Product Manager</p>
+            </div>
           </div>
-        )}
+        </div>
+      </section>
 
-        {view === "feedback" && report && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
-            <section>
-              <h2 className="text-sm font-semibold text-slate-900 mb-1">Correctness</h2>
-              <p className="text-sm text-slate-600">{report.correctnessNotes}</p>
-            </section>
-            <section>
-              <h2 className="text-sm font-semibold text-slate-900 mb-1">Complexity awareness</h2>
-              <p className="text-sm text-slate-600">{report.complexityNotes}</p>
-            </section>
-            <section>
-              <h2 className="text-sm font-semibold text-slate-900 mb-1">Communication</h2>
-              <p className="text-sm text-slate-600">{report.communicationNotes}</p>
-            </section>
+      {/* CTA Section */}
+      <section className="py-20 px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl font-bold mb-6 text-gray-900">Ready to Ace Your Next Interview?</h2>
+          <p className="text-xl text-gray-600 mb-8">
+            Join thousands of users who have improved their interview skills with InterviewIQ.
+          </p>
+          <Link href="/interview/create">
+            <Button variant="default" size="lg">
+              Start Free Interview
+            </Button>
+          </Link>
+        </div>
+      </section>
 
-            {report.quotedMoments?.length > 0 && (
-              <section>
-                <h2 className="text-sm font-semibold text-slate-900 mb-2">Key moments</h2>
-                <div className="space-y-2">
-                  {report.quotedMoments.map((m, i) => (
-                    <blockquote
-                      key={i}
-                      className="border-l-2 border-slate-300 pl-3 text-sm text-slate-700 italic"
-                    >
-                      &ldquo;{m.quote}&rdquo;
-                      <div className="not-italic text-xs text-slate-400 mt-1">{m.why}</div>
-                    </blockquote>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            <section>
-              <h2 className="text-sm font-semibold text-slate-900 mb-1">Next steps</h2>
-              <p className="text-sm text-slate-600">{report.nextSteps}</p>
-            </section>
-
-            <button
-              onClick={startOver}
-              className="w-full rounded-lg bg-slate-900 text-white py-2.5 text-sm font-medium hover:bg-slate-800"
-            >
-              Start a new interview
-            </button>
+      {/* Footer */}
+      <footer className="bg-gray-800 text-white py-12 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div>
+              <h3 className="text-2xl font-bold mb-4">InterviewIQ</h3>
+              <p className="text-gray-400">
+                Your AI-powered interview preparation partner.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4">Product</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="/interview/create" className="hover:text-white">New Interview</a></li>
+                <li><a href="#" className="hover:text-white">Features</a></li>
+                <li><a href="#" className="hover:text-white">Pricing</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4">Resources</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="#" className="hover:text-white">Blog</a></li>
+                <li><a href="#" className="hover:text-white">Guides</a></li>
+                <li><a href="#" className="hover:text-white">FAQ</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4">Legal</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="#" className="hover:text-white">Privacy Policy</a></li>
+                <li><a href="#" className="hover:text-white">Terms of Service</a></li>
+                <li><a href="#" className="hover:text-white">Cookie Policy</a></li>
+              </ul>
+            </div>
           </div>
-        )}
-      </div>
-    </main>
+          <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
+            <p>© {year} InterviewIQ. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }

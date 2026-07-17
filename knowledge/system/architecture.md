@@ -13,20 +13,23 @@ updated: 2026-07-17
 
 ## Tech Stack
 
-- **Frontend & Backend**: Next.js 16 (App Router) + TypeScript + Tailwind CSS (single deployable unit)
-- **AI Agents**: OpenAI Agents SDK (`@openai/agents`) — real agents with tool calling
+- **Frontend & Backend**: Next.js 16 (App Router) + TypeScript + Tailwind CSS v4 (single deployable unit)
+- **AI Agents**: OpenAI Agents SDK (`@openai/agents`) — real agents with tool calling and structured outputs
 - **Database**: Drizzle ORM + Neon Postgres (serverless HTTP driver)
 - **Auth**: Anonymous UUID cookies — no login, no signup
 - **Validation**: Zod (TypeScript-first schema validation)
+- **Charts**: Chart.js + react-chartjs-2 (BarChart, RadarChart)
+- **CSS**: Tailwind CSS v4 with custom design tokens
 
 ## High-Level Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Frontend (Next.js)                        │
-│  • Question picker (role / difficulty)                       │
-│  • Live chat interface                                       │
-│  • Feedback display                                          │
+│  • Landing / configuration page                              │
+│  • Interview create form (mode / role / difficulty / timer)  │
+│  • Live interview chat with hints & scoring                  │
+│  • Feedback display with charts                              │
 └──────────────────────┬──────────────────────────────────────┘
                        │ HTTP
                        ▼
@@ -35,7 +38,8 @@ updated: 2026-07-17
 │  • POST /api/session/start                                  │
 │  • POST /api/session/[id]/respond (message → agent loop)    │
 │  • POST /api/session/[id]/finish (generate feedback)        │
-│  • GET /api/test-* (debug endpoints)                        │
+│  • GET /api/test-model (sanity check)                       │
+│  • GET /api/test-session (DB connection test)               │
 └──────────────────────┬──────────────────────────────────────┘
                        │
      ┌─────────────────┼─────────────────┐
@@ -55,21 +59,51 @@ updated: 2026-07-17
 - **Cookie**: `iq_session` (httpOnly, 1-year expiry, lax SameSite)
 - **All interview data** tied to this UUID, no user table
 
-### 2. Agent Layer (`lib/agents/`)
+### 2. Question Bank (`lib/questions.ts`)
+
+- 10 built-in DSA questions (3 easy, 4 medium, 3 hard)
+- CSV / JSON import for custom question banks
+- `pickQuestion()` filters by difficulty and picks randomly
+- `normalizeImportedQuestions()` handles CSV, JSON array, or JSON object with `questions` key
+
+### 3. Answer Scoring (`lib/interviewScoring.ts`)
+
+- Real-time heuristic scoring of candidate answers
+- Checks: length, structure signals, complexity mentions, edge cases, examples, communication clarity
+- Mode-aware: different signals for coding, system-design, behavioral
+- Returns score (0-100), strength tier (weak/medium/strong), focus areas, summary
+
+### 4. Progressive Hints (`lib/hints.ts`)
+
+- 3-level hint system per interview mode
+- Signal-aware hints based on question topic (linked-list, tree, graph, string, array, parentheses)
+- Adaptive: tailors hint text based on what the candidate already wrote
+
+### 5. Timed Mode (`lib/timedMode.ts`)
+
+- 3 presets: short (3 min), medium (10 min), long (20 min)
+- `formatTime()` for MM:SS display
+
+### 6. Agent Layer (`lib/agents/`)
 
 #### Interviewer Agent
 - **Tool**: `flag_weakness(topic, note)` — logs specific gaps
-- **Instructions**: "Respond with ONE sharp, specific follow-up grounded in what they actually wrote"
+- **Mode-aware instructions**: adapts dynamically for coding, system-design, or behavioral
+- **Code detection**: `looksLikeCode()` detects code snippets in answers to tailor follow-ups
 - **Behavior**: Reads candidate answer, flags weaknesses, asks real follow-ups
 - **Lives in**: `lib/agents/interviewerAgent.ts`
 
 #### Feedback Agent
-- **Structured Output**: Zod schema for reliable JSON reports
+- **Structured Output**: Zod schema (`feedbackReportSchema`) for reliable JSON reports
 - **Input**: Full interview transcript
-- **Output**: Structured feedback with quotes and specific recommendations
+- **Output**: Structured report with correctnessNotes, complexityNotes, communicationNotes, quotedMoments (2-4), nextSteps
 - **Lives in**: `lib/agents/feedbackAgent.ts`
 
-### 3. Fallback Strategy (`lib/agents/runWithFallback.ts`)
+### 7. Fallback Strategy (`lib/agents/runWithFallback.ts` + `lib/callModel.ts`)
+
+Two parallel implementations:
+- `callModel()` — used for raw chat completions (test endpoint)
+- `runAgentWithFallback()` — used for agent-based calls (respond, finish)
 
 All AI calls wrapped in:
 1. Try OpenAI first
@@ -78,12 +112,18 @@ All AI calls wrapped in:
 4. On `401`, `403`, `429` (quota), or `5xx` → fallback to OpenRouter
 5. Tag response with provider used
 
-### 4. Database (`lib/db/`)
+### 8. Providers (`lib/agents/providers.ts`)
+
+- Lazy-initialized `OpenAIChatCompletionsModel` instances
+- OpenAI client for primary, OpenRouter client (pointed at openrouter.ai baseURL) for fallback
+- No global `setDefaultOpenAIClient()` — per-call provider switching
+
+### 9. Database (`lib/db/`)
 
 **Drizzle ORM schema** with tables:
-- `sessions` — interview metadata (anonId, questionId, role, difficulty, createdAt, finishedAt)
-- `transcript` — individual messages (sessionId, role, message, timestamp)
-- `feedback` — final report (sessionId, report JSON, createdAt)
+- `sessions` — interview metadata (id, sessionId, role, difficulty, status, createdAt)
+- `transcript_events` — individual messages (id, sessionId, role, content, createdAt)
+- `feedback_reports` — final report (id, sessionId, correctnessNotes, complexityNotes, communicationNotes, quotedMoments, nextSteps, createdAt)
 
 **Queries via serverless HTTP driver** (Neon) — no persistent connections needed.
 
@@ -93,9 +133,9 @@ All AI calls wrapped in:
 POST /api/session/start
 │
 ├─> getOrCreateAnonId() → UUID cookie
-├─> SELECT random question filtered by difficulty
 ├─> INSERT into sessions table
-└─> Return question + sessionId
+├─> INSERT question prompt as first transcript_event
+└─> Return sessionId + question
 ```
 
 ## Request Flow: Send Response
@@ -103,13 +143,13 @@ POST /api/session/start
 ```
 POST /api/session/[id]/respond
 │
-├─> Verify session exists & not finished
-├─> Add user message to transcript
-├─> Create InterviewerAgent instance
+├─> Insert user message into transcript_events
+├─> Load full transcript (all history)
+├─> Detect if answer contains code (looksLikeCode)
+├─> Create InterviewerAgent instance (mode-aware)
 ├─> Agent reads transcript, calls flag_weakness if needed
-├─> Get agent response
-├─> Add agent message to transcript
-└─> Return agent response + any flagged weaknesses
+├─> Insert agent reply into transcript_events
+└─> Return agent response + any flagged weaknesses + provider
 ```
 
 ## Request Flow: Finish Interview
@@ -117,13 +157,12 @@ POST /api/session/[id]/respond
 ```
 POST /api/session/[id]/finish
 │
-├─> Verify session exists
+├─> Mark session as completed (status = "completed")
+├─> Load full transcript
 ├─> Create FeedbackAgent instance
-├─> Agent reads full transcript
-├─> Agent generates structured feedback (JSON)
-├─> INSERT feedback into DB
-├─> Mark session as finished
-└─> Return feedback report
+├─> Agent reads full transcript via structured output
+├─> INSERT feedback_reports into DB
+└─> Return report + provider
 ```
 
 ## Error Handling & Resilience
@@ -133,6 +172,22 @@ POST /api/session/[id]/finish
 - **Invalid Request** (`400`): Fail immediately, don't mask bugs
 - **Server Errors** (`5xx`): Fallback strategy kicks in
 - **Network Issues**: Rely on Next.js timeout and retry mechanisms
+
+## UI Component Architecture
+
+```
+components/
+├── navigation/
+│   └── Header.tsx            — App header with brand + "New Interview" CTA
+├── ui/
+│   ├── Button.tsx             — Link or button with variant/size system
+│   └── Form.tsx               — Form, Input, Select, TextArea components
+├── feedback/
+│   └── Toast.tsx              — Auto-dismiss notification (success/error/info)
+└── charts/
+    ├── BarChart.tsx           — Chart.js bar chart for skill breakdown
+    └── RadarChart.tsx         — Chart.js radar chart for performance overview
+```
 
 ## Deployment
 
@@ -151,3 +206,5 @@ POST /api/session/[id]/finish
 | **Anonymous Sessions** | Zero friction before first interview |
 | **Structured Feedback** | Zod ensures reliable JSON, no parsing hacks |
 | **Next.js (not separate API)** | Simpler deployment, shorter latency |
+| **Multi-mode interviews** | Single app serves coding, system-design, behavioral |
+| **CSV/JSON import** | Users can practice on their own question banks |

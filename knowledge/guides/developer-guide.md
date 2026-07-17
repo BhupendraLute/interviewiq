@@ -28,11 +28,11 @@ cd interviewiq
 npm install
 
 # Environment variables
-cp .env.example .env.local
+cp .env.local.example .env.local
 
-# Add to .env.local:
+# Fill in .env.local with your keys:
 OPENAI_API_KEY=sk-...
-OPENROUTER_API_KEY=sk-...
+OPENROUTER_API_KEY=sk-or-...
 DATABASE_URL=postgresql://...
 
 # Generate Drizzle client
@@ -53,56 +53,71 @@ Visit `http://localhost:3000`.
 
 ```
 interviewiq/
-├── knowledge/                    # OKF knowledge base
-│   ├── _index.md
-│   ├── system/
-│   │   ├── architecture.md
-│   │   ├── sessions.md
-│   │   └── interview-flow.md
-│   ├── agents/
-│   │   ├── interviewer-agent.md
-│   │   └── feedback-agent.md
-│   ├── questions/
-│   │   ├── easy-questions.md
-│   │   ├── medium-questions.md
-│   │   └── hard-questions.md
-│   └── guides/
-│       ├── user-guide.md
-│       ├── developer-guide.md
-│       └── api-reference.md
-│
-├── app/                         # Next.js App Router
-│   ├── layout.tsx               # Root layout
-│   ├── page.tsx                 # Home / question selector
-│   ├── globals.css
+├── app/                             # Next.js App Router
+│   ├── layout.tsx                   # Root layout with Header
+│   ├── page.tsx                     # Landing page
+│   ├── globals.css                  # Tailwind v4 + custom theme
+│   ├── styles/
+│   │   ├── globals.css              # shadcn-style theme vars
+│   │   └── tokens.css               # Design tokens (colors, spacing, etc.)
+│   ├── interview/
+│   │   ├── create/page.tsx          # Interview config form
+│   │   └── [id]/
+│   │       ├── page.tsx             # Live interview chat
+│   │       └── report/page.tsx      # Feedback report (mock data)
 │   └── api/
 │       ├── session/
-│       │   ├── start/route.ts    # POST /api/session/start
+│       │   ├── start/route.ts       # POST /api/session/start
 │       │   └── [id]/
-│       │       ├── respond/route.ts
-│       │       └── finish/route.ts
-│       ├── test-model/route.ts
-│       └── test-session/route.ts
+│       │       ├── respond/route.ts # POST /api/session/[id]/respond
+│       │       └── finish/route.ts  # POST /api/session/[id]/finish
+│       ├── test-model/route.ts      # GET /api/test-model
+│       └── test-session/route.ts    # GET /api/test-session
 │
-├── lib/                         # Core logic
-│   ├── questions.ts             # Question bank (QUESTION_BANK array)
-│   ├── session.ts               # Anonymous session management
-│   ├── callModel.ts             # Raw API call wrapper
+├── components/                      # UI components
+│   ├── navigation/
+│   │   └── Header.tsx               # App header
+│   ├── ui/
+│   │   ├── Button.tsx               # Link/button component
+│   │   └── Form.tsx                 # Form, Input, Select, TextArea
+│   ├── feedback/
+│   │   └── Toast.tsx                # Auto-dismiss notification
+│   └── charts/
+│       ├── BarChart.tsx             # Chart.js bar chart
+│       └── RadarChart.tsx           # Chart.js radar chart
+│
+├── lib/                             # Core logic
+│   ├── questions.ts                 # Question bank (10 built-in) + CSV/JSON import
+│   ├── session.ts                   # Anonymous session management (UUID cookie)
+│   ├── callModel.ts                 # Raw OpenAI/OpenRouter chat completions
+│   ├── api.ts                       # Mock API client (to be replaced)
+│   ├── hints.ts                     # 3-level progressive hints
+│   ├── interviewScoring.ts          # Real-time answer scoring
+│   ├── timedMode.ts                 # Timer presets (3/10/20 min)
+│   ├── utils.ts                     # cn() utility (clsx + tailwind-merge)
+│   ├── lib/
+│   │   ├── api.ts                   # Duplicate mock API client
+│   │   └── utils.ts                 # Duplicate cn() utility
 │   ├── db/
-│   │   ├── index.ts             # Database queries (drizzle orm)
-│   │   └── schema.ts            # Drizzle schema (sessions, transcript, feedback)
+│   │   ├── index.ts                 # Lazy Drizzle/Neon init
+│   │   └── schema.ts                # Drizzle schema (sessions, transcript_events, feedback_reports)
 │   └── agents/
-│       ├── interviewerAgent.ts   # Interviewer agent factory + flag_weakness tool
-│       ├── feedbackAgent.ts      # Feedback agent factory + structured output
-│       ├── providers.ts          # Model initialization (OpenAI, OpenRouter)
-│       └── runWithFallback.ts    # Fallback strategy wrapper
+│       ├── interviewerAgent.ts      # Interviewer agent factory + flag_weakness tool
+│       ├── feedbackAgent.ts         # Feedback agent factory + structured output
+│       ├── providers.ts             # Lazy model initialization (OpenAI, OpenRouter)
+│       └── runWithFallback.ts       # Agent-based fallback strategy
 │
-├── public/                      # Static assets
+├── knowledge/                       # OKF knowledge base (this directory)
+├── public/                          # Static assets
 ├── package.json
 ├── tsconfig.json
 ├── next.config.ts
 ├── drizzle.config.ts
-└── knowledge/                   # This file you're reading
+├── eslint.config.mjs
+├── postcss.config.mjs
+├── .env.local.example
+├── AGENTS.md
+└── CLAUDE.md
 ```
 
 ---
@@ -114,53 +129,67 @@ interviewiq/
 Sessions are tied to a UUID cookie, not a user ID.
 
 ```typescript
-// Get or create anon ID (lib/session.ts)
+// lib/session.ts
 const anonId = await getOrCreateAnonId();
-
-// All subsequent calls use this ID
+// Sets httpOnly cookie "iq_session" with 1-year expiry
 // No auth provider, no user table
 ```
 
 ### 2. Agent-First Architecture
 
-Every interview is real agents working together:
+Every interview uses real agents with tool calling:
 
 ```typescript
-// Interviewer Agent (real-time)
-const agent = makeInterviewerAgent(model, collected);
-const response = await agent.run(transcript);
+// Interviewer Agent (real-time, mode-aware)
+const agent = makeInterviewerAgent(model, collected, "coding", false);
+const { finalOutput, provider } = await runAgentWithFallback(
+  (model) => makeInterviewerAgent(model, flagged, mode, isCodeAnswer),
+  transcript
+);
 
 // Feedback Agent (at end)
-const feedbackAgent = makeFeedbackAgent(model);
-const report = await feedbackAgent.run(transcript);
+const { finalOutput, provider } = await runAgentWithFallback<FeedbackReport>(
+  (model) => makeFeedbackAgent(model),
+  formattedTranscript
+);
 ```
 
 ### 3. Fallback Strategy
 
-All AI calls wrapped for resilience:
+Two parallel implementations:
+- `runAgentWithFallback()` for Agents SDK agents (respond, finish)
+- `callModel()` for raw chat completions (test-model)
+
+Both follow the same rules:
+- Try OpenAI first
+- 400 → fail immediately
+- 429 (rate limit) → retry with backoff, then fallback
+- 401/403/quota 429/5xx → fallback to OpenRouter
+
+### 4. Provider Architecture
 
 ```typescript
-// lib/agents/runWithFallback.ts
-const result = await runWithFallback({
-  openaiCall: () => callOpenAI(prompt),
-  openrouterCall: () => callOpenRouter(prompt),
-  onFallback: () => logFallback(),
-});
+// lib/agents/providers.ts — lazy singleton models
+const openaiModel = getOpenAIModel();     // OpenAI client
+const openrouterModel = getOpenRouterModel();  // OpenRouter via baseURL swap
+
+// Agents are rebuilt per-call with the selected model
+// No global setDefaultOpenAIClient()
 ```
 
-### 4. Zod Validation
-
-Structured output for reliability:
+### 5. Database: Lazy Initialization
 
 ```typescript
-const FeedbackSchema = z.object({
-  score: z.number().min(1).max(10),
-  strengths: z.array(z.string()),
-  weaknesses: z.array(z.string()),
-  // ...
-});
-
-const parsed = FeedbackSchema.parse(agentOutput);
+// lib/db/index.ts — NOT constructed at module load time
+// Next.js evaluates modules during build step — eager init would crash
+export function getDb() {
+  if (_db) return _db;
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL is not set");
+  const sql = neon(url);
+  _db = drizzle(sql, { schema });
+  return _db;
+}
 ```
 
 ---
@@ -173,7 +202,6 @@ const parsed = FeedbackSchema.parse(agentOutput);
 
 ```typescript
 export const QUESTION_BANK: Question[] = [
-  // existing questions...
   {
     id: "q_new",
     title: "My New Question",
@@ -184,44 +212,59 @@ export const QUESTION_BANK: Question[] = [
 ];
 ```
 
-Then document it in `knowledge/questions/medium-questions.md`.
+Or import questions via CSV/JSON at runtime:
+
+```typescript
+const imported = normalizeImportedQuestions(csvString);
+// Supports: CSV, JSON array, JSON object with "questions" key
+```
+
+Then document it in `knowledge/questions/`.
 
 ### Modifying the Interviewer Agent
 
 **File**: `lib/agents/interviewerAgent.ts`
 
-```typescript
-const INTERVIEWER_INSTRUCTIONS = `
-Your new instructions here...
-`;
-
-// Tool remains the same
-export function makeFlagWeaknessTool(collected: ...) { ... }
-```
+Key functions:
+- `getInterviewerInstructions(mode, isCodeAnswer)` — builds mode-aware prompt
+- `looksLikeCode(answer)` — auto-detects code in candidate answer
+- `makeFlagWeaknessTool(collected)` — creates the flag tool
+- `makeInterviewerAgent(model, collected, mode, isCodeAnswer)` — factory
 
 ### Modifying Feedback Schema
 
 **File**: `lib/agents/feedbackAgent.ts`
 
 ```typescript
-const FeedbackSchema = z.object({
-  // Add new fields here
-  newField: z.string(),
-  // ...
+const feedbackReportSchema = z.object({
+  correctnessNotes: z.string(),
+  complexityNotes: z.string(),
+  communicationNotes: z.string(),
+  quotedMoments: z.array(z.object({
+    speaker: z.enum(["user", "ai"]),
+    quote: z.string(),
+    why: z.string(),
+  })).min(2).max(4),
+  nextSteps: z.string(),
 });
 ```
 
 ### Adding API Routes
 
-**File**: `app/api/[path]/route.ts`
+Next.js App Router auto-maps `app/api/[path]/route.ts` to `/api/[path]`.
 
 ```typescript
-export async function POST(request: Request) {
-  // Handler logic
-}
+export async function POST(request: NextRequest) { ... }
+export async function GET() { ... }
 ```
 
-Next.js automatically maps to `/api/[path]`.
+### UI Components
+
+All in `components/`:
+- **Button** — supports variant (primary/secondary/icon), size (sm/md/lg), href (renders Link)
+- **Form/Input/Select/TextArea** — form components with error states
+- **Toast** — auto-dismiss notification (5s)
+- **BarChart/RadarChart** — Chart.js wrappers for feedback display
 
 ---
 
@@ -230,40 +273,45 @@ Next.js automatically maps to `/api/[path]`.
 ### 1. Local Development
 
 ```bash
-npm run dev
+npm run dev    # Starts Next.js dev server on localhost:3000
+npm run lint   # ESLint
+npm run build  # Type-check + production build
 ```
-
-Starts Next.js dev server on `localhost:3000` with hot reload.
 
 ### 2. Database Migrations
 
 After modifying `lib/db/schema.ts`:
 
 ```bash
-npm run db:generate   # Creates migration files
-npm run db:push       # Applies to DB
+npm run db:generate   # Creates migration files in drizzle/
+npm run db:push       # Applies to Neon database
 ```
 
 ### 3. Testing Endpoints
 
-Use the debug endpoints:
-
 ```bash
+# Verify model fallback chain
 curl http://localhost:3000/api/test-model
+
+# Verify DB connectivity
 curl http://localhost:3000/api/test-session
 ```
 
-Or manually start an interview in the UI.
+### 4. End-to-End Flow
 
-### 4. Debugging
+```bash
+# Start interview
+curl -X POST http://localhost:3000/api/session/start \
+  -H "Content-Type: application/json" \
+  -d '{"role":"Frontend Developer","difficulty":"easy"}'
 
-```typescript
-// Use console.log for server-side logs
-console.log("Debug info:", data);
+# Get sessionId from response, then:
+curl -X POST http://localhost:3000/api/session/<id>/respond \
+  -H "Content-Type: application/json" \
+  -d '{"message":"I would use a hash map...","mode":"coding"}'
 
-// Use browser DevTools for client-side
-// Network tab for API calls
-// React DevTools for component state
+curl -X POST http://localhost:3000/api/session/<id>/finish \
+  -H "Content-Type: application/json" -d '{}'
 ```
 
 ---
@@ -277,16 +325,18 @@ console.log("Debug info:", data);
 git push origin main
 
 # Vercel auto-deploys from main
-# Set env vars in Vercel dashboard
+# Set env vars in Vercel dashboard:
 ```
 
 ### Environment Variables (Production)
 
 ```
 OPENAI_API_KEY=sk-...
-OPENROUTER_API_KEY=sk-...
+OPENROUTER_API_KEY=sk-or-...
+OPENAI_MODEL=gpt-4o-mini
+OPENROUTER_MODEL=meta-llama/llama-3.1-8b-instruct:free
 DATABASE_URL=postgresql://...
-NODE_ENV=production
+APP_URL=https://interviewiq.vercel.app
 ```
 
 ### Database
@@ -310,130 +360,27 @@ Neon Postgres is serverless-friendly:
 
 ### Fix a Bug
 
-1. Create issue if not exists
-2. Create branch: `git checkout -b fix/bug-name`
-3. Reproduce bug
-4. Fix and test
-5. Push PR with "Fixes #123"
-
-### Performance Optimization
-
-- Profile with DevTools
-- Check slow API routes (agent timeouts)
-- Optimize DB queries (add indexes)
-- Review fallback strategy effectiveness
-
-### Monitoring in Production
-
-```bash
-# Logs (Vercel)
-vercel logs
-
-# Database (Neon)
-# Check admin console at console.neon.tech
-
-# Model usage
-# Track API costs from OpenAI/OpenRouter dashboards
-```
-
----
-
-## Testing
-
-### Manual Testing
-
-Visit the app, take an interview end-to-end:
-1. Start interview (easy)
-2. Submit answer
-3. Respond to follow-ups
-4. Finish interview
-5. Review feedback
-
-### Unit Testing
-
-```bash
-npm test
-```
-
-(Not yet implemented; add Jest config if needed.)
-
-### E2E Testing
-
-```bash
-npm run e2e
-```
-
-(Not yet implemented; Playwright would be good.)
-
----
-
-## Troubleshooting
-
-### "OpenAI quota exhausted"
-
-Fallback to OpenRouter should kick in automatically. Check logs:
-```bash
-vercel logs | grep openrouter
-```
-
-### "Database connection error"
-
-```bash
-# Verify DATABASE_URL is correct
-echo $DATABASE_URL
-
-# Restart dev server
-npm run dev
-```
-
-### "Agent response is empty"
-
-- Check model is initialized correctly
-- Verify API keys are set
-- Check fallback logic in `runWithFallback.ts`
-
-### "Session ID not found"
-
-- Verify cookie is being set (Chrome DevTools → Cookies)
-- Check DB has the session record
-- Verify session ID is being passed correctly
-
----
-
-## Contributing
-
-We welcome contributions! Please:
-
-1. Fork the repo
-2. Create a feature branch
-3. Make changes
-4. Update OKF documentation
-5. Test thoroughly
-6. Submit PR with description
+1. Create branch: `git checkout -b fix/bug-name`
+2. Reproduce bug
+3. Fix and test
+4. Push PR
 
 ---
 
 ## Code Style
 
 - **TypeScript**: Strict mode, no `any`
-- **Naming**: camelCase for functions, PascalCase for types/classes
-- **Comments**: Explain *why*, not *what*
-- **OKF Docs**: Keep knowledge base up-to-date
+- **Naming**: camelCase for functions, PascalCase for types
+- **Path aliases**: `@/` maps to project root
 
 ---
 
 ## Architecture Decisions
 
-See `knowledge/system/architecture.md` for detailed rationale on:
-- Why OpenAI Agents SDK
-- Why serverless DB
-- Why anonymous sessions
-- Why fallback strategy
+See `knowledge/system/architecture.md` for detailed rationale.
 
 ---
 
 ## Support & Questions
 
-- **Issues**: [GitHub Issues](https://github.com)
-- **Discussions**: [GitHub Discussions](https://github.com)
-- **Email**: dev@interviewiq.example.com
+- **Issues**: [GitHub Issues](https://github.com/BhupendraLute/interviewiq)
