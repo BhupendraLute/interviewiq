@@ -4,6 +4,7 @@ import { transcriptEvents } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { runAgentWithFallback } from "@/lib/agents/runWithFallback";
 import { makeInterviewerAgent } from "@/lib/agents/interviewerAgent";
+import type { InterviewMode } from "@/lib/interviewScoring";
 
 // POST /api/session/[id]/respond
 // Body: { message: string }
@@ -11,7 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const { id: sessionId } = await params;
     const db = getDb();
-    const { message } = await req.json();
+    const { message, mode } = await req.json();
     if (!message || typeof message !== "string") {
       return NextResponse.json({ ok: false, error: "message is required" }, { status: 400 });
     }
@@ -37,8 +38,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // 3. Run the interviewer agent (OpenAI first, OpenRouter fallback).
     const flagged: { topic: string; note: string }[] = [];
+    const interviewMode = (mode as InterviewMode | undefined) ?? "coding";
     const { finalOutput, provider } = await runAgentWithFallback<string>(
-      (model) => makeInterviewerAgent(model, flagged),
+      (model) => makeInterviewerAgent(model, flagged, interviewMode),
       agentInput as any
     );
 

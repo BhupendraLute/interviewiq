@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
+import { normalizeImportedQuestions } from "@/lib/questions";
+import type { Question } from "@/lib/questions";
+import { getInterviewModeLabel, scoreAnswer, type InterviewMode } from "@/lib/interviewScoring";
 
 type View = "setup" | "interview" | "feedback";
 
@@ -16,11 +19,13 @@ type FeedbackReport = {
 
 const ROLES = ["SDE-1 Frontend", "SDE-2 Backend", "SDE-2 Full Stack"];
 const DIFFICULTIES = ["easy", "medium", "hard"] as const;
+const MODES: InterviewMode[] = ["coding", "system-design", "behavioral"];
 
 export default function Home() {
   const [view, setView] = useState<View>("setup");
   const [role, setRole] = useState(ROLES[1]);
   const [difficulty, setDifficulty] = useState<(typeof DIFFICULTIES)[number]>("medium");
+  const [mode, setMode] = useState<InterviewMode>("coding");
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
@@ -28,6 +33,10 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<FeedbackReport | null>(null);
+  const [importedQuestions, setImportedQuestions] = useState<Question[] | null>(null);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [currentScore, setCurrentScore] = useState<number | null>(null);
+  const [scoreSummary, setScoreSummary] = useState<string | null>(null);
 
   async function startInterview() {
     setLoading(true);
@@ -36,13 +45,15 @@ export default function Home() {
       const res = await fetch("/api/session/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, difficulty }),
+        body: JSON.stringify({ role, difficulty, questions: importedQuestions ?? undefined }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Failed to start interview");
 
       setSessionId(data.sessionId);
       setTranscript([{ role: "ai", content: data.question.prompt }]);
+      setCurrentScore(null);
+      setScoreSummary(null);
       setView("interview");
     } catch (e: any) {
       setError(e.message);
@@ -61,10 +72,13 @@ export default function Home() {
       const res = await fetch(`/api/session/${sessionId}/respond`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, mode }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Failed to get a response");
+      const score = scoreAnswer(text, mode);
+      setCurrentScore(score.score);
+      setScoreSummary(`${score.summary} Focus: ${score.focusAreas.join("; ")}`);
       setTranscript((t) => [...t, { role: "ai", content: data.reply }]);
     } catch (e: any) {
       setError(e.message);
@@ -96,7 +110,26 @@ export default function Home() {
     setAnswer("");
     setReport(null);
     setError(null);
+    setCurrentScore(null);
+    setScoreSummary(null);
     setView("setup");
+  }
+
+  async function handleQuestionFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const questions = normalizeImportedQuestions(text);
+      setImportedQuestions(questions);
+      setImportMessage(`Loaded ${questions.length} questions from ${file.name}.`);
+      setError(null);
+    } catch (e: any) {
+      setImportedQuestions(null);
+      setImportMessage(null);
+      setError(e.message || "Failed to read the question file.");
+    }
   }
 
   return (
@@ -144,6 +177,45 @@ export default function Home() {
                   ))}
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Interview mode</label>
+                <select
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value as InterviewMode)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  {MODES.map((m) => (
+                    <option key={m} value={m}>
+                      {getInterviewModeLabel(m)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Import question pack (JSON or CSV)
+                </label>
+                <input
+                  type="file"
+                  accept="application/json,.json,text/csv,.csv"
+                  onChange={handleQuestionFileChange}
+                  className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-full file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white"
+                />
+                {importMessage && <p className="mt-2 text-sm text-emerald-600">{importMessage}</p>}
+                {importedQuestions && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImportedQuestions(null);
+                      setImportMessage("Using the built-in question bank.");
+                    }}
+                    className="mt-2 text-sm text-slate-600 underline"
+                  >
+                    Use built-in questions instead
+                  </button>
+                )}
+              </div>
+
               <button
                 onClick={startInterview}
                 disabled={loading}
@@ -180,6 +252,16 @@ export default function Home() {
               rows={5}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono"
             />
+
+            {currentScore !== null && (
+              <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-slate-800">Current score</p>
+                  <span className="text-sm font-medium text-slate-700">{currentScore}/100</span>
+                </div>
+                {scoreSummary && <p className="mt-1 text-sm text-slate-600">{scoreSummary}</p>}
+              </div>
+            )}
 
             <div className="flex gap-2 mt-3">
               <button

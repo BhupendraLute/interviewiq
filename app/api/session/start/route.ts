@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getOrCreateAnonId } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { sessions, transcriptEvents } from "@/lib/db/schema";
-import { pickQuestion } from "@/lib/questions";
+import { normalizeImportedQuestions, pickQuestion } from "@/lib/questions";
 
 // POST /api/session/start
 // Body: { role: string, difficulty: "easy" | "medium" | "hard" }
 export async function POST(req: NextRequest) {
   try {
-    const { role, difficulty } = await req.json();
+    const { role, difficulty, questions } = await req.json();
 
     if (!role || !difficulty) {
       return NextResponse.json(
@@ -20,7 +20,8 @@ export async function POST(req: NextRequest) {
     const anonId = await getOrCreateAnonId(); // ensures the anon cookie is set, no login involved
     const db = getDb();
 
-    const question = pickQuestion(difficulty);
+    const importedQuestions = questions ? normalizeImportedQuestions(questions) : undefined;
+    const question = pickQuestion(difficulty, importedQuestions ?? []);
 
     const [session] = await db
       .insert(sessions)
