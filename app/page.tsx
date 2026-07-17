@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { normalizeImportedQuestions } from "@/lib/questions";
 import type { Question } from "@/lib/questions";
 import { getInterviewModeLabel, scoreAnswer, type InterviewMode } from "@/lib/interviewScoring";
 import { buildProgressiveHint } from "@/lib/hints";
+import { formatTime, getTimerConfig, getTimerPresetLabel, type TimerPreset } from "@/lib/timedMode";
 
 type View = "setup" | "interview" | "feedback";
 
@@ -21,6 +22,7 @@ type FeedbackReport = {
 const ROLES = ["SDE-1 Frontend", "SDE-2 Backend", "SDE-2 Full Stack"];
 const DIFFICULTIES = ["easy", "medium", "hard"] as const;
 const MODES: InterviewMode[] = ["coding", "system-design", "behavioral"];
+const TIMER_PRESETS: TimerPreset[] = ["short", "medium", "long"];
 
 export default function Home() {
   const [view, setView] = useState<View>("setup");
@@ -40,6 +42,8 @@ export default function Home() {
   const [scoreSummary, setScoreSummary] = useState<string | null>(null);
   const [hintLevel, setHintLevel] = useState(1);
   const [hintMessage, setHintMessage] = useState<string | null>(null);
+  const [timerPreset, setTimerPreset] = useState<TimerPreset>("medium");
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   async function startInterview() {
     setLoading(true);
@@ -59,6 +63,8 @@ export default function Home() {
       setScoreSummary(null);
       setHintLevel(1);
       setHintMessage(null);
+      const timer = getTimerConfig(timerPreset);
+      setTimeLeft(timer.seconds);
       setView("interview");
     } catch (e: any) {
       setError(e.message);
@@ -119,6 +125,7 @@ export default function Home() {
     setScoreSummary(null);
     setHintLevel(1);
     setHintMessage(null);
+    setTimeLeft(null);
     setView("setup");
   }
 
@@ -137,6 +144,27 @@ export default function Home() {
     setHintLevel((value) => value + 1);
     setHintMessage(nextHint);
   }
+
+  useEffect(() => {
+    if (view !== "interview" || timeLeft === null) return;
+
+    if (timeLeft === 0) {
+      setError("Time is up. You can finish the interview or submit one last response.");
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setTimeLeft((current) => {
+        if (current === null || current <= 1) {
+          window.clearInterval(interval);
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [view, timeLeft]);
 
   async function handleQuestionFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -214,6 +242,20 @@ export default function Home() {
                   ))}
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Time limit</label>
+                <select
+                  value={timerPreset}
+                  onChange={(e) => setTimerPreset(e.target.value as TimerPreset)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  {TIMER_PRESETS.map((preset) => (
+                    <option key={preset} value={preset}>
+                      {getTimerPresetLabel(preset)}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Import question pack (JSON or CSV)
@@ -283,6 +325,12 @@ export default function Home() {
                   <span className="text-sm font-medium text-slate-700">{currentScore}/100</span>
                 </div>
                 {scoreSummary && <p className="mt-1 text-sm text-slate-600">{scoreSummary}</p>}
+              </div>
+            )}
+
+            {timeLeft !== null && (
+              <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                <span className="font-semibold">Time left:</span> {formatTime(timeLeft)}
               </div>
             )}
 
