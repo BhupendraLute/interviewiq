@@ -4,6 +4,7 @@ import { useState, type ChangeEvent } from "react";
 import { normalizeImportedQuestions } from "@/lib/questions";
 import type { Question } from "@/lib/questions";
 import { getInterviewModeLabel, scoreAnswer, type InterviewMode } from "@/lib/interviewScoring";
+import { buildProgressiveHint } from "@/lib/hints";
 
 type View = "setup" | "interview" | "feedback";
 
@@ -37,6 +38,8 @@ export default function Home() {
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [currentScore, setCurrentScore] = useState<number | null>(null);
   const [scoreSummary, setScoreSummary] = useState<string | null>(null);
+  const [hintLevel, setHintLevel] = useState(1);
+  const [hintMessage, setHintMessage] = useState<string | null>(null);
 
   async function startInterview() {
     setLoading(true);
@@ -54,6 +57,8 @@ export default function Home() {
       setTranscript([{ role: "ai", content: data.question.prompt }]);
       setCurrentScore(null);
       setScoreSummary(null);
+      setHintLevel(1);
+      setHintMessage(null);
       setView("interview");
     } catch (e: any) {
       setError(e.message);
@@ -112,7 +117,25 @@ export default function Home() {
     setError(null);
     setCurrentScore(null);
     setScoreSummary(null);
+    setHintLevel(1);
+    setHintMessage(null);
     setView("setup");
+  }
+
+  function requestHint() {
+    if (!transcript[0]?.content) return;
+
+    const currentAnswer = transcript.filter((item) => item.role === "user").slice(-1)[0]?.content ?? answer;
+    const prompt = transcript[0].content;
+    const nextHint = buildProgressiveHint({
+      prompt,
+      answer: currentAnswer,
+      mode,
+      hintLevel,
+    });
+
+    setHintLevel((value) => value + 1);
+    setHintMessage(nextHint);
   }
 
   async function handleQuestionFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -263,6 +286,12 @@ export default function Home() {
               </div>
             )}
 
+            {hintMessage && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                {hintMessage}
+              </div>
+            )}
+
             <div className="flex gap-2 mt-3">
               <button
                 onClick={() => submitAnswer(answer)}
@@ -272,11 +301,11 @@ export default function Home() {
                 Submit
               </button>
               <button
-                onClick={() => submitAnswer("I'm stuck, can you give me a hint?")}
-                disabled={loading}
+                onClick={requestHint}
+                disabled={loading || hintLevel > 3}
                 className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
               >
-                I&apos;m stuck
+                {hintLevel > 3 ? "Hints used" : `Hint ${hintLevel}`}
               </button>
             </div>
 
