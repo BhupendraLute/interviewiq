@@ -28,7 +28,34 @@ export function makeFlagWeaknessTool(collected: { topic: string; note: string }[
   });
 }
 
-function getInterviewerInstructions(mode: InterviewMode) {
+export function looksLikeCode(answer: string): boolean {
+  const normalized = answer.toLowerCase();
+  const codeSignals = [
+    "function ",
+    "const ",
+    "let ",
+    "var ",
+    "class ",
+    "=>",
+    "return ",
+    "if (",
+    "for (",
+    "while (",
+    "console.log",
+    "{",
+    "}",
+    ";",
+    "import ",
+    "export ",
+    "def ",
+    "public static",
+    "private",
+  ];
+
+  return codeSignals.some((signal) => normalized.includes(signal));
+}
+
+function getInterviewerInstructions(mode: InterviewMode, isCodeAnswer: boolean) {
   const modeSpecific = {
     coding:
       "You are running a coding interview. Focus on correctness, algorithm choice, complexity, and edge cases. Ask about implementation details, tradeoffs, and what could break.",
@@ -38,9 +65,16 @@ function getInterviewerInstructions(mode: InterviewMode) {
       "You are running a behavioral interview. Focus on specific examples, ownership, collaboration, conflict resolution, impact, and lessons learned. Ask for concrete situations and outcomes.",
   }[mode];
 
-  return `You are an experienced technical interviewer conducting a live ${modeSpecific} mock interview.
+  const codeInstruction = isCodeAnswer
+    ? "The candidate just shared code or pseudocode. Probe implementation details, edge cases, performance, or how the solution behaves on tricky inputs."
+    : "Focus on the strongest concrete gap in their reasoning.";
+
+  return `You are an experienced technical interviewer conducting a live ${mode} mock interview.
 
 You have just seen the candidate's submitted approach or code for the current question. Respond with ONE sharp, specific follow-up question grounded in what they actually wrote. Never ask a generic canned question.
+
+${modeSpecific}
+${codeInstruction}
 
 If you notice a specific, concrete weakness (not a vague concern), call flag_weakness to log it before responding.
 
@@ -54,11 +88,12 @@ Keep your response to 2-4 sentences. Tone: professional, direct, encouraging but
 export function makeInterviewerAgent(
   model: ReturnType<typeof getOpenAIModel>,
   collected: { topic: string; note: string }[],
-  mode: InterviewMode = "coding"
+  mode: InterviewMode = "coding",
+  isCodeAnswer = false
 ) {
   return new Agent({
     name: "InterviewIQ Interviewer",
-    instructions: getInterviewerInstructions(mode),
+    instructions: getInterviewerInstructions(mode, isCodeAnswer),
     model,
     tools: [makeFlagWeaknessTool(collected)],
   });
