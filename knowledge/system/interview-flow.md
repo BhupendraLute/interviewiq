@@ -61,7 +61,7 @@ POST /api/session/[id]/respond  { message, mode: "coding" | "system-design" | "b
   ├─> Return to client:
   │    ├─ reply (follow-up question)
   │    ├─ flagged[] (weaknesses logged in this turn)
-  │    └─ provider ("openai" | "openrouter")
+  │    └─ provider ("openai" | "openrouter" | "opencodezen")
   │
   └─> UI displays response, user can continue or end interview
        [Client-side timer runs based on duration selected]
@@ -324,9 +324,9 @@ Supports custom question banks via:
 |-------|----------|
 | Missing message | Return 400 — message required |
 | Agent API error (`400`) | Return error to client, don't retry |
-| Agent rate limited (`429`) | Automatic fallback to OpenRouter |
-| Agent quota exhausted | Automatic fallback to OpenRouter |
-| Agent server error (`5xx`) | Automatic fallback to OpenRouter |
+| Agent rate limited (`429`) | Automatic fallback to OpenRouter, then OpenCode Zen |
+| Agent quota exhausted | Automatic fallback to OpenRouter, then OpenCode Zen |
+| Agent server error (`5xx`) | Automatic fallback to OpenRouter, then OpenCode Zen |
 
 ### During Feedback (Phase 3)
 
@@ -356,11 +356,18 @@ try OpenAI {
   → rebuild agent with OpenRouter model
 }
 
-FALLBACK {
+FALLBACK (OpenRouter) {
   build fresh agent with OpenRouter model
   run with same input
-  tag response with "openrouter"
+  if (fails) → rebuild agent with OpenCode Zen model
+  tag response with provider
+}
+
+FALLBACK (OpenCode Zen) {
+  build fresh agent with OpenCode Zen model (big-pickle, free)
+  run with same input
+  tag response with "opencodezen"
 }
 ```
 
-This ensures interviews continue even if OpenAI quota is hit. The Agent SDK's model is fixed at construction time, so fallback requires constructing a second agent instance bound to OpenRouter.
+This ensures interviews continue even if OpenAI or OpenRouter quota is hit. The Agent SDK's model is fixed at construction time, so fallback requires constructing a new agent instance bound to the next provider.

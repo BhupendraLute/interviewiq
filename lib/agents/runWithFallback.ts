@@ -1,5 +1,5 @@
 import { Agent, run, AgentInputItem } from "@openai/agents";
-import { getOpenAIModel, getOpenRouterModel } from "./providers";
+import { getOpenAIModel, getOpenRouterModel, getOpenCodeZenModel } from "./providers";
 
 /**
  * runAgentWithFallback — the Agents-SDK equivalent of lib/callModel.ts.
@@ -9,7 +9,8 @@ import { getOpenAIModel, getOpenRouterModel } from "./providers";
  * that builds a fresh Agent bound to whichever model we pass it. We
  * build the OpenAI-bound agent first and run it; on a qualifying
  * error we build a second agent bound to the OpenRouter model and
- * run that instead. Same error rules as callModel.ts:
+ * run that instead. If OpenRouter also fails, we fall back to OpenCode Zen.
+ * Same error rules as callModel.ts:
  *  - 400 -> rethrow immediately, don't fall back (our bug)
  *  - plain 429 (rate limit, not quota) -> one backoff retry on OpenAI
  *  - 401/403, quota-exhausted 429, or 5xx -> fall back to OpenRouter
@@ -49,7 +50,7 @@ function isServerError(err: any) {
 export async function runAgentWithFallback<TOutput = string>(
   makeAgent: MakeAgent,
   input: string | AgentInputItem[]
-): Promise<{ finalOutput: TOutput; provider: "openai" | "openrouter" }> {
+): Promise<{ finalOutput: TOutput; provider: "openai" | "openrouter" | "opencodezen" }> {
   const openaiAgent = makeAgent(getOpenAIModel());
 
   try {
@@ -79,7 +80,16 @@ export async function runAgentWithFallback<TOutput = string>(
     }
 
     const openRouterAgent = makeAgent(getOpenRouterModel());
-    const fallbackResult = await run(openRouterAgent, input);
-    return { finalOutput: fallbackResult.finalOutput as TOutput, provider: "openrouter" };
+    try {
+      const fallbackResult = await run(openRouterAgent, input);
+      return { finalOutput: fallbackResult.finalOutput as TOutput, provider: "openrouter" };
+    } catch (openRouterErr: any) {
+      console.warn(
+        `[runAgentWithFallback] OpenRouter also failed (${openRouterErr.message}), falling back to OpenCode Zen.`
+      );
+      const openCodeZenAgent = makeAgent(getOpenCodeZenModel());
+      const zenResult = await run(openCodeZenAgent, input);
+      return { finalOutput: zenResult.finalOutput as TOutput, provider: "opencodezen" };
+    }
   }
 }

@@ -17,7 +17,7 @@ export type StartSessionResult = {
 
 export type RespondResult = {
   reply: string;
-  provider: "openai" | "openrouter";
+  provider: "openai" | "openrouter" | "opencodezen";
   flagged: { topic: string; note: string }[];
 };
 
@@ -31,7 +31,7 @@ export type FeedbackReport = {
 
 export type FinishSessionResult = {
   report: FeedbackReport;
-  provider: "openai" | "openrouter";
+  provider: "openai" | "openrouter" | "opencodezen";
 };
 
 export async function createSession(

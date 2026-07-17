@@ -15,7 +15,7 @@ updated: 2026-07-18
 
 - Node.js 18+
 - Postgres database (Neon recommended)
-- OpenAI and OpenRouter API keys
+- OpenAI, OpenRouter, and OpenCode Zen API keys
 
 ### Setup
 
@@ -33,6 +33,7 @@ cp .env.local.example .env.local
 # Fill in .env.local with your keys:
 OPENAI_API_KEY=sk-...
 OPENROUTER_API_KEY=sk-or-...
+OPENCODEZEN_API_KEY=sk-...
 DATABASE_URL=postgresql://...
 
 # Generate Drizzle client
@@ -96,7 +97,7 @@ interviewiq/
 ├── lib/                             # Core logic
 │   ├── questions.ts                 # Question bank (10 built-in) + CSV/JSON import
 │   ├── session.ts                   # Anonymous session management (UUID cookie)
-│   ├── callModel.ts                 # Raw OpenAI/OpenRouter chat completions
+│   ├── callModel.ts                 # Raw OpenAI/OpenRouter/OpenCode Zen chat completions
 │   ├── api.ts                       # Client-side API helpers (createSession, respond, finishSession, getReport)
 │   ├── hints.ts                     # 3-level progressive hints
 │   ├── interviewScoring.ts          # Real-time answer scoring
@@ -108,7 +109,7 @@ interviewiq/
 │   └── agents/
 │       ├── interviewerAgent.ts      # Interviewer agent factory + flag_weakness tool
 │       ├── feedbackAgent.ts         # Feedback agent factory + structured output
-│       ├── providers.ts             # Lazy model initialization (OpenAI, OpenRouter)
+│       ├── providers.ts             # Lazy model initialization (OpenAI, OpenRouter, OpenCode Zen)
 │       └── runWithFallback.ts       # Agent-based fallback strategy
 │
 ├── knowledge/                       # OKF knowledge base (this directory)
@@ -170,13 +171,15 @@ Both follow the same rules:
 - 400 → fail immediately
 - 429 (rate limit) → retry with backoff, then fallback
 - 401/403/quota 429/5xx → fallback to OpenRouter
+- If OpenRouter also fails → fallback to OpenCode Zen (big-pickle, free)
 
 ### 4. Provider Architecture
 
 ```typescript
 // lib/agents/providers.ts — lazy singleton models
-const openaiModel = getOpenAIModel();        // OpenAI client (gpt-4o-mini)
-const openrouterModel = getOpenRouterModel(); // OpenRouter via baseURL swap
+const openaiModel = getOpenAIModel();           // OpenAI client (gpt-4o-mini)
+const openrouterModel = getOpenRouterModel();    // OpenRouter via baseURL swap
+const openCodeZenModel = getOpenCodeZenModel(); // OpenCode Zen (big-pickle, free)
 
 // Agents are rebuilt per-call with the selected model
 // No global setDefaultOpenAIClient()
@@ -339,8 +342,10 @@ git push origin main
 ```
 OPENAI_API_KEY=sk-...
 OPENROUTER_API_KEY=sk-or-...
+OPENCODEZEN_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o-mini
 OPENROUTER_MODEL=meta-llama/llama-3.1-8b-instruct:free
+OPENCODEZEN_MODEL=big-pickle
 DATABASE_URL=postgresql://...
 APP_URL=https://interviewiq.vercel.app
 ```

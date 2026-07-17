@@ -7,10 +7,11 @@
  *     or server error (5xx) -> fall back to OpenRouter automatically.
  *  3. On plain rate-limiting (429 without insufficient_quota) -> brief
  *     backoff retry against OpenAI itself before falling back.
- *  4. On 400 (bad request) -> do NOT fall back; that's our bug, not a
+ *  4. If OpenRouter also fails -> fall back to OpenCode Zen (big-pickle, free).
+ *  5. On 400 (bad request) -> do NOT fall back; that's our bug, not a
  *     provider issue. Throw immediately so it surfaces during dev.
  *
- * Both providers speak the OpenAI-compatible chat completions schema,
+ * All providers speak the OpenAI-compatible chat completions schema,
  * so the request body is shared between them.
  */
 
@@ -21,17 +22,19 @@ export type ChatMessage = {
 
 export type CallModelResult = {
   content: string;
-  provider: "openai" | "openrouter";
+  provider: "openai" | "openrouter" | "opencodezen";
   model: string;
 };
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENCODEZEN_URL = "https://opencode.ai/zen/v1/chat/completions";
 
 // Swap these freely without touching call sites.
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const OPENROUTER_MODEL =
   process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct:free";
+const OPENCODEZEN_MODEL = process.env.OPENCODEZEN_MODEL || "big-pickle";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -116,6 +119,42 @@ async function callOpenRouter(
   };
 }
 
+async function callOpenCodeZen(
+  messages: ChatMessage[],
+  { temperature = 0.7, max_tokens = 800 }: { temperature?: number; max_tokens?: number } = {}
+): Promise<CallModelResult> {
+  const apiKey = process.env.OPENCODEZEN_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENCODEZEN_API_KEY missing — cannot fall back to OpenCode Zen");
+  }
+
+  const res = await fetch(OPENCODEZEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: OPENCODEZEN_MODEL,
+      messages,
+      temperature,
+      max_tokens,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.error?.message || `OpenCode Zen error ${res.status}`);
+  }
+
+  const data = await res.json();
+  return {
+    content: data.choices?.[0]?.message?.content ?? "",
+    provider: "opencodezen",
+    model: OPENCODEZEN_MODEL,
+  };
+}
+
 function isQuotaExhausted(err: any): boolean {
   return err?.status === 429 && err?.code === "insufficient_quota";
 }
@@ -157,7 +196,14 @@ export async function callModel(
         return await callOpenAI(messages, options);
       } catch (retryErr) {
         console.warn("[callModel] Retry failed, falling back to OpenRouter.");
-        return await callOpenRouter(messages, options);
+        try {
+          return await callOpenRouter(messages, options);
+        } catch (openRouterErr: any) {
+          console.warn(
+            `[callModel] OpenRouter also failed (${openRouterErr.message}), falling back to OpenCode Zen.`
+          );
+          return await callOpenCodeZen(messages, options);
+        }
       }
     }
 
@@ -166,12 +212,26 @@ export async function callModel(
       console.warn(
         `[callModel] OpenAI unavailable (${err.status ?? "no status"} ${err.code ?? ""}), falling back to OpenRouter.`
       );
-      return await callOpenRouter(messages, options);
+      try {
+        return await callOpenRouter(messages, options);
+      } catch (openRouterErr: any) {
+        console.warn(
+          `[callModel] OpenRouter also failed (${openRouterErr.message}), falling back to OpenCode Zen.`
+        );
+        return await callOpenCodeZen(messages, options);
+      }
     }
 
     // Unknown error shape — safest default is to still try the fallback
     // rather than hard-fail the whole interview.
     console.warn("[callModel] Unrecognized OpenAI error, attempting OpenRouter fallback:", err.message);
-    return await callOpenRouter(messages, options);
+    try {
+      return await callOpenRouter(messages, options);
+    } catch (openRouterErr: any) {
+      console.warn(
+        `[callModel] OpenRouter also failed (${openRouterErr.message}), falling back to OpenCode Zen.`
+      );
+      return await callOpenCodeZen(messages, options);
+    }
   }
 }

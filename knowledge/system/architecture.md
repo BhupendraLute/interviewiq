@@ -52,6 +52,12 @@ updated: 2026-07-18
 │  OpenAI      │ │ OpenRouter   │ │  Neon       │
 │  (Primary)   │ │  (Fallback)  │ │  Postgres   │
 └──────────────┘ └──────────────┘ └──────────────┘
+                       │
+                       ▼
+               ┌──────────────┐
+               │ OpenCode Zen │
+               │  (Fallback)  │
+               └──────────────┘
 ```
 
 ## Core Components
@@ -113,12 +119,14 @@ All AI calls wrapped in:
 2. On `400` → fail immediately (request error)
 3. On `429` (rate limit, not quota) → one backoff retry, then fallback
 4. On `401`, `403`, `429` (quota), or `5xx` → fallback to OpenRouter
-5. Tag response with provider used
+5. If OpenRouter also fails → fallback to OpenCode Zen (big-pickle, free)
+6. Tag response with provider used
 
 ### 8. Providers (`lib/agents/providers.ts`)
 
 - Lazy-initialized `OpenAIChatCompletionsModel` instances
-- OpenAI client for primary, OpenRouter client (pointed at openrouter.ai baseURL) for fallback
+- OpenAI client for primary, OpenRouter client (pointed at openrouter.ai baseURL) for first fallback
+- OpenCode Zen client (pointed at opencode.ai/zen/v1 baseURL) for second fallback
 - No global `setDefaultOpenAIClient()` — per-call provider switching
 
 ### 9. Database (`lib/db/`)
@@ -171,7 +179,7 @@ POST /api/session/[id]/finish
 ## Error Handling & Resilience
 
 - **Rate Limiting**: One retry with backoff before fallback
-- **Quota Exhausted**: Immediate fallback to OpenRouter
+- **Quota Exhausted**: Immediate fallback to OpenRouter, then OpenCode Zen
 - **Invalid Request** (`400`): Fail immediately, don't mask bugs
 - **Server Errors** (`5xx`): Fallback strategy kicks in
 - **Network Issues**: Rely on Next.js timeout and retry mechanisms
@@ -207,7 +215,7 @@ components/
 
 - **Primary**: Deploy to Vercel (Next.js native)
 - **Database**: Neon Postgres (serverless, HTTP-driven)
-- **Environment**: `.env.local` with OpenAI and OpenRouter keys
+- **Environment**: `.env.local` with OpenAI, OpenRouter, and OpenCode Zen keys
 - **Scaling**: Serverless by default, stateless API routes
 
 ## Key Design Decisions
@@ -215,7 +223,7 @@ components/
 | Decision | Rationale |
 |----------|-----------|
 | **OpenAI Agents SDK** | Real tool calling, not prompt engineering |
-| **Fallback Strategy** | Free tier resilience against quota limits |
+| **Three-Tier Fallback** | Free tier resilience against quota limits (OpenAI → OpenRouter → OpenCode Zen) |
 | **Serverless DB** | No connection pooling needed for short-lived routes |
 | **Anonymous Sessions** | Zero friction before first interview |
 | **Structured Feedback** | Zod ensures reliable JSON, no parsing hacks |

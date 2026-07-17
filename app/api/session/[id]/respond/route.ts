@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       content: row.content,
     }));
 
-    // 3. Run the interviewer agent (OpenAI first, OpenRouter fallback).
+    // 3. Run the interviewer agent (OpenAI first, OpenRouter fallback, OpenCode Zen last resort).
     const flagged: { topic: string; note: string }[] = [];
     const interviewMode = (mode as InterviewMode | undefined) ?? "coding";
     const isCodeAnswer = looksLikeCode(message);
