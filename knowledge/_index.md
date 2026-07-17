@@ -11,7 +11,7 @@ topics:
   - dsa
   - technical-preparation
 author: OpenAI × NamasteDev Codex Hackathon
-source_url: https://github.com/yourusername/interviewiq
+source_url: https://github.com/BhupendraLute/interviewiq
 ---
 
 # InterviewIQ Knowledge Base
@@ -75,6 +75,6 @@ How InterviewIQ works from a user and developer perspective.
 
 ## Quick Links
 
-- **Live App**: [InterviewIQ](https://interviewiq.example.com)
-- **GitHub**: [repo link]
+- **Live App**: [InterviewIQ](https://interviewiq.example.com) <-- not deployed currently -->
+- **GitHub**: [InterviewIQ Repository](https://github.com/BhupendraLute/interviewiq)
 - **OKF Spec**: [GitHub knowledge-catalog](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
