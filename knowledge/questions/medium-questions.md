@@ -6,7 +6,7 @@ subtopic: medium
 difficulty: medium
 count: 4
 source_file: lib/questions.ts
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Medium DSA Questions

@@ -4,7 +4,7 @@ description: Setup, development, and contribution guide for developers
 topic: guides
 subtopic: developer-guide
 audience: developers
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Developer Guide: InterviewIQ
@@ -54,50 +54,54 @@ Visit `http://localhost:3000`.
 ```
 interviewiq/
 ├── app/                             # Next.js App Router
-│   ├── layout.tsx                   # Root layout with Header
-│   ├── page.tsx                     # Landing page
+│   ├── layout.tsx                   # Root layout with Header + Geist font
+│   ├── page.tsx                     # Landing page (hero, features, testimonials, CTA)
 │   ├── globals.css                  # Tailwind v4 + custom theme
 │   ├── styles/
 │   │   ├── globals.css              # shadcn-style theme vars
 │   │   └── tokens.css               # Design tokens (colors, spacing, etc.)
 │   ├── interview/
-│   │   ├── create/page.tsx          # Interview config form
+│   │   ├── create/page.tsx          # Interview config form (role, difficulty, mode)
 │   │   └── [id]/
-│   │       ├── page.tsx             # Live interview chat
-│   │       └── report/page.tsx      # Feedback report (mock data)
+│   │       ├── page.tsx             # Live interview chat with AI conversation UI
+│   │       └── report/page.tsx      # Feedback report (API-driven, structured output)
 │   └── api/
 │       ├── session/
 │       │   ├── start/route.ts       # POST /api/session/start
 │       │   └── [id]/
 │       │       ├── respond/route.ts # POST /api/session/[id]/respond
-│       │       └── finish/route.ts  # POST /api/session/[id]/finish
+│       │       └── finish/route.ts  # GET (fetch report) + POST (generate report)
 │       ├── test-model/route.ts      # GET /api/test-model
 │       └── test-session/route.ts    # GET /api/test-session
 │
 ├── components/                      # UI components
 │   ├── navigation/
 │   │   └── Header.tsx               # App header
-│   ├── ui/
-│   │   ├── Button.tsx               # Link/button component
-│   │   └── Form.tsx                 # Form, Input, Select, TextArea
+│   ├── ai-elements/                 # AI conversation UI
+│   │   ├── conversation.tsx         # Scrollable conversation container
+│   │   ├── message.tsx              # Chat message with role styling
+│   │   ├── prompt-input.tsx         # Text input with submit
+│   │   ├── suggestion.tsx           # Clickable suggestion chips
+│   │   └── shimmer.tsx              # Loading animation
 │   ├── feedback/
 │   │   └── Toast.tsx                # Auto-dismiss notification
-│   └── charts/
-│       ├── BarChart.tsx             # Chart.js bar chart
-│       └── RadarChart.tsx           # Chart.js radar chart
+│   ├── charts/
+│   │   ├── BarChart.tsx             # Chart.js bar chart
+│   │   └── RadarChart.tsx           # Chart.js radar chart
+│   └── ui/                          # shadcn/ui components (25+)
+│       ├── button.tsx, card.tsx, input.tsx, select.tsx
+│       ├── dialog.tsx, tabs.tsx, badge.tsx, tooltip.tsx
+│       └── ... (base-nova style via shadcn CLI)
 │
 ├── lib/                             # Core logic
 │   ├── questions.ts                 # Question bank (10 built-in) + CSV/JSON import
 │   ├── session.ts                   # Anonymous session management (UUID cookie)
 │   ├── callModel.ts                 # Raw OpenAI/OpenRouter chat completions
-│   ├── api.ts                       # Mock API client (to be replaced)
+│   ├── api.ts                       # Client-side API helpers (createSession, respond, finishSession, getReport)
 │   ├── hints.ts                     # 3-level progressive hints
 │   ├── interviewScoring.ts          # Real-time answer scoring
 │   ├── timedMode.ts                 # Timer presets (3/10/20 min)
 │   ├── utils.ts                     # cn() utility (clsx + tailwind-merge)
-│   ├── lib/
-│   │   ├── api.ts                   # Duplicate mock API client
-│   │   └── utils.ts                 # Duplicate cn() utility
 │   ├── db/
 │   │   ├── index.ts                 # Lazy Drizzle/Neon init
 │   │   └── schema.ts                # Drizzle schema (sessions, transcript_events, feedback_reports)
@@ -108,13 +112,14 @@ interviewiq/
 │       └── runWithFallback.ts       # Agent-based fallback strategy
 │
 ├── knowledge/                       # OKF knowledge base (this directory)
-├── public/                          # Static assets
+├── public/                          # Static assets (hero-image.png, SVGs)
 ├── package.json
 ├── tsconfig.json
 ├── next.config.ts
 ├── drizzle.config.ts
 ├── eslint.config.mjs
 ├── postcss.config.mjs
+├── components.json                  # shadcn/ui config (base-nova style)
 ├── .env.local.example
 ├── AGENTS.md
 └── CLAUDE.md
@@ -170,8 +175,8 @@ Both follow the same rules:
 
 ```typescript
 // lib/agents/providers.ts — lazy singleton models
-const openaiModel = getOpenAIModel();     // OpenAI client
-const openrouterModel = getOpenRouterModel();  // OpenRouter via baseURL swap
+const openaiModel = getOpenAIModel();        // OpenAI client (gpt-4o-mini)
+const openrouterModel = getOpenRouterModel(); // OpenRouter via baseURL swap
 
 // Agents are rebuilt per-call with the selected model
 // No global setDefaultOpenAIClient()
@@ -261,8 +266,9 @@ export async function GET() { ... }
 ### UI Components
 
 All in `components/`:
-- **Button** — supports variant (primary/secondary/icon), size (sm/md/lg), href (renders Link)
-- **Form/Input/Select/TextArea** — form components with error states
+- **Header** — navigation bar with brand link and "New Interview" CTA
+- **AI Elements** — `Conversation`, `Message`, `PromptInput`, `Suggestion`, `Shimmer` for the interview chat UI
+- **shadcn/ui** — 25+ base components (Button, Card, Input, Select, Dialog, Tabs, Badge, Tooltip, etc.) in base-nova style
 - **Toast** — auto-dismiss notification (5s)
 - **BarChart/RadarChart** — Chart.js wrappers for feedback display
 

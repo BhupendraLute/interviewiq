@@ -4,7 +4,7 @@ description: Complete API endpoint documentation
 topic: guides
 subtopic: api
 audience: developers
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # API Reference
@@ -148,19 +148,72 @@ curl -X POST https://interviewiq.example.com/api/session/uuid-12345/respond \
 
 ---
 
-### 3. Finish Interview
+### 3. Finish Interview / Get Report
 
-**POST** `/session/[id]/finish`
+The finish endpoint supports both **GET** (fetch existing report) and **POST** (generate new report).
 
-Ends the interview and generates a feedback report.
+#### 3a. Get Existing Report
 
-#### URL Parameters
+**GET** `/session/[id]/finish`
+
+Fetches an existing feedback report for a completed session.
+
+##### URL Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `id` | uuid | Session ID from start response |
 
-#### Request Body
+##### Response
+
+```json
+{
+  "ok": true,
+  "report": {
+    "correctnessNotes": "Correctly identified the hash map O(n) approach...",
+    "complexityNotes": "Initial answer didn't mention space complexity...",
+    "communicationNotes": "Clear and confident...",
+    "quotedMoments": [
+      {
+        "speaker": "user",
+        "quote": "I'd use a hash map...",
+        "why": "Quickly identified optimal approach"
+      }
+    ],
+    "nextSteps": "Practice proactively stating both time and space complexity..."
+  }
+}
+```
+
+##### Status Codes
+
+| Code | Meaning |
+|------|---------|
+| 200 | Success — report found |
+| 404 | Report not found (session may not be completed yet) |
+| 500 | Server error |
+
+##### Example
+
+```bash
+curl https://interviewiq.example.com/api/session/uuid-12345/finish
+```
+
+---
+
+#### 3b. Generate Report
+
+**POST** `/session/[id]/finish`
+
+Ends the interview and generates a feedback report.
+
+##### URL Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | uuid | Session ID from start response |
+
+##### Request Body
 
 ```json
 {}
@@ -168,7 +221,7 @@ Ends the interview and generates a feedback report.
 
 (Empty body)
 
-#### Response
+##### Response
 
 ```json
 {
@@ -190,21 +243,22 @@ Ends the interview and generates a feedback report.
 }
 ```
 
-#### Status Codes
+##### Status Codes
 
 | Code | Meaning |
 |------|---------|
 | 200 | Success |
 | 500 | Feedback generation error |
 
-#### Notes
+##### Notes
 
 - Updates session status to `"completed"`
 - Formats transcript as `USER: ...\n\nAI: ...` text
 - Feedback agent generates Zod-validated structured output
 - Result saved to `feedback_reports` table
+- Response includes `provider` field indicating which AI handled the request
 
-#### Example
+##### Example
 
 ```bash
 curl -X POST https://interviewiq.example.com/api/session/uuid-12345/finish \
@@ -279,10 +333,11 @@ Example: `400` on missing required fields, `500` on server/agent errors.
 
 ## Changelog
 
-### v1.1.0 (Current)
+### v1.2.0 (Current)
 
 - ✅ `/session/start` — create interview (with optional custom question import)
 - ✅ `/session/[id]/respond` — submit answer with mode selection, get follow-up
-- ✅ `/session/[id]/finish` — end interview, get structured feedback
+- ✅ `/session/[id]/finish` (GET) — fetch existing feedback report
+- ✅ `/session/[id]/finish` (POST) — end interview, generate structured feedback
 - ✅ `/test-model` — verify fallback chain
 - ✅ `/test-session` — verify DB connectivity

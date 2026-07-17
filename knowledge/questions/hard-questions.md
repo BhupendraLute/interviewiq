@@ -6,7 +6,7 @@ subtopic: hard
 difficulty: hard
 count: 3
 source_file: lib/questions.ts
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Hard DSA Questions

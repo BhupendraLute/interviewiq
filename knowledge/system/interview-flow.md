@@ -7,7 +7,7 @@ related:
   - architecture.md
   - ../agents/interviewer-agent.md
   - ../agents/feedback-agent.md
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Interview Flow & Agent Loop
@@ -22,10 +22,9 @@ User visits app → sees landing page with features
   ├─> Click "Start Free Interview" → /interview/create
   │
   ├─> User fills create form:
-  │    • Interview Type: technical | behavioral | system-design
   │    • Job Role: (free text, e.g. "Frontend Developer")
   │    • Difficulty: easy | medium | hard
-  │    • Duration: 15 | 30 | 45 | 60 minutes
+  │    • Interview Mode: coding | system-design | behavioral
   │
   ├─> POST /api/session/start
   │    ├─> getOrCreateAnonId() → UUID cookie
@@ -102,20 +101,24 @@ POST /api/session/[id]/finish
        └─ nextSteps
 ```
 
-### Phase 4: Feedback Display (Current — Mock Data)
+### Phase 4: Feedback Display (API-Driven)
 
 ```
 User navigates to /interview/[id]/report
   │
-  ├─> Displays mock score (75/100)
-  ├─> Strong areas list
-  ├─> Areas to improve list
-  ├─> BarChart (skill breakdown) + RadarChart (performance overview)
-  ├─> Detailed feedback text
-  └─> Options: Retry interview | Create new interview
+  ├─> GET /api/session/[id]/finish (fetches existing report)
+  │
+  ├─> Displays structured report:
+  │    ├─ Correctness & Problem Solving (correctnessNotes)
+  │    ├─ Complexity & Depth (complexityNotes)
+  │    ├─ Communication & Clarity (communicationNotes)
+  │    ├─ Key Moments (quotedMoments — 2-4 attributed quotes)
+  │    └─ Next Steps (nextSteps)
+  │
+  └─> Options: New Interview | Back to Home
 ```
 
-Note: The report page currently uses mock data. Integration with the actual /finish API endpoint is in progress.
+The report page fetches the generated feedback via `GET /api/session/[id]/finish` and renders the structured Zod-validated output from the Feedback Agent.
 
 ---
 

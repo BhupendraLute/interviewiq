@@ -4,7 +4,7 @@ description: How to use the Open Knowledge Format in InterviewIQ
 topic: okf
 format: OKF v1.0
 created: 2026-07-17
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # OKF Implementation Guide for InterviewIQ
@@ -27,23 +27,25 @@ knowledge/
 ├── _index.md                    # Root index (entry point)
 │
 ├── system/                      # System & architecture docs
-│   ├── architecture.md          # Tech stack, design
+│   ├── architecture.md          # Tech stack, design, component tree
 │   ├── sessions.md              # Data models, session lifecycle
 │   └── interview-flow.md        # Step-by-step interview process
 │
 ├── agents/                      # AI agent documentation
-│   ├── interviewer-agent.md     # Real-time interviewer
-│   └── feedback-agent.md        # Feedback generation
+│   ├── interviewer-agent.md     # Real-time interviewer with flag_weakness tool
+│   └── feedback-agent.md        # Structured feedback with Zod output
 │
 ├── questions/                   # Question bank
-│   ├── easy-questions.md        # Easy DSA questions
-│   ├── medium-questions.md      # Medium DSA questions
-│   └── hard-questions.md        # Hard DSA questions
+│   ├── easy-questions.md        # Easy DSA questions (Two Sum, Valid Parentheses, Reverse Linked List)
+│   ├── medium-questions.md      # Medium DSA questions (Longest Substring, Binary Tree, Islands, Coin Change)
+│   └── hard-questions.md        # Hard DSA questions (LIS, Merge K Sorted Lists, Word Ladder)
 │
-└── guides/                      # User & developer guides
-    ├── user-guide.md            # How to take an interview
-    ├── developer-guide.md       # Setup & development
-    └── api-reference.md         # API endpoint docs
+├── guides/                      # User & developer guides
+│   ├── user-guide.md            # How to take an interview
+│   ├── developer-guide.md       # Setup, project structure & development
+│   └── api-reference.md         # API endpoint docs (start, respond, finish GET/POST)
+│
+└── OKF.md                       # This file — OKF implementation guide
 ```
 
 ## YAML Frontmatter

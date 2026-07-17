@@ -6,7 +6,7 @@ subtopic: database
 related:
   - architecture.md
   - interview-flow.md
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Session Model & Data Storage

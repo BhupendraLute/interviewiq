@@ -7,7 +7,7 @@ source_file: lib/agents/feedbackAgent.ts
 related:
   - interviewer-agent.md
   - ../system/interview-flow.md
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Feedback Agent

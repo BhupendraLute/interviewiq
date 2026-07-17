@@ -4,7 +4,7 @@ description: Step-by-step guide for candidates taking interviews
 topic: guides
 subtopic: user-guide
 audience: candidates
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # User Guide: Taking an Interview on InterviewIQ
@@ -28,12 +28,11 @@ You'll see a landing page with features. Click **"Start Free Interview"** to beg
 
 On the **Create Interview** page, you select:
 
-- **Interview Type**: Technical (DSA) | Behavioral | System Design
-- **Job Role**: Free text (e.g., "Frontend Developer")
+- **Job Role**: Free text (e.g., "Frontend Developer", "SDE-2 Backend")
 - **Difficulty**: Easy | Medium | Hard
-- **Duration**: 15 | 30 | 45 | 60 minutes
+- **Interview Mode**: Coding / Technical | System Design | Behavioral
 
-**Recommendation**: Start with Technical / Easy if you're new to DSA. Build to Medium/Hard as you get stronger.
+**Recommendation**: Start with Coding / Easy if you're new to DSA. Build to Medium/Hard as you get stronger.
 
 ### 3. Click "Start Interview"
 
@@ -114,15 +113,13 @@ The agent uses the `flag_weakness` tool to log concrete gaps it spots. These are
 
 ## After the Interview: Feedback
 
-When you click "Submit Interview", you navigate to the **Report** page showing:
+When you click "End Interview", you navigate to the **Report** page showing:
 
-- **Score** (0-100)
-- **Strong Areas** and **Areas to Improve**
-- **Skill Breakdown** (BarChart)
-- **Performance Overview** (RadarChart)
-- **Detailed feedback text**
-
-> Note: The report page currently shows example data. Full integration with the API-driven feedback is in progress.
+- **Correctness & Problem Solving** — assessment of your solution's correctness
+- **Complexity & Depth** — analysis of your time/space complexity awareness
+- **Communication & Clarity** — how well you explained your thinking
+- **Key Moments** — 2-4 quoted moments from the conversation with attribution
+- **Next Steps** — concrete, actionable recommendations
 
 ---
 

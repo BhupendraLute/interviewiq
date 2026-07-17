@@ -6,20 +6,23 @@ subtopic: system-design
 related:
   - sessions.md
   - interview-flow.md
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # InterviewIQ Architecture
 
 ## Tech Stack
 
-- **Frontend & Backend**: Next.js 16 (App Router) + TypeScript + Tailwind CSS v4 (single deployable unit)
+- **Frontend & Backend**: Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS v4 (single deployable unit)
 - **AI Agents**: OpenAI Agents SDK (`@openai/agents`) — real agents with tool calling and structured outputs
 - **Database**: Drizzle ORM + Neon Postgres (serverless HTTP driver)
 - **Auth**: Anonymous UUID cookies — no login, no signup
+- **UI Components**: shadcn/ui (base-nova style) + Radix UI primitives + Lucide icons
 - **Validation**: Zod (TypeScript-first schema validation)
 - **Charts**: Chart.js + react-chartjs-2 (BarChart, RadarChart)
-- **CSS**: Tailwind CSS v4 with custom design tokens
+- **Motion**: Framer Motion (`motion` package)
+- **Streaming**: `streamdown` + plugins (code, math, mermaid, CJK)
+- **CSS**: Tailwind CSS v4 with custom design tokens + `tw-animate-css`
 
 ## High-Level Architecture
 
@@ -178,15 +181,26 @@ POST /api/session/[id]/finish
 ```
 components/
 ├── navigation/
-│   └── Header.tsx            — App header with brand + "New Interview" CTA
-├── ui/
-│   ├── Button.tsx             — Link or button with variant/size system
-│   └── Form.tsx               — Form, Input, Select, TextArea components
+│   └── Header.tsx              — App header with brand + "New Interview" CTA
+├── ai-elements/                — AI conversation UI components
+│   ├── conversation.tsx        — Scrollable conversation container
+│   ├── message.tsx             — Chat message with role-based styling
+│   ├── prompt-input.tsx        — Text input with submit button
+│   ├── suggestion.tsx          — Clickable suggestion chips
+│   └── shimmer.tsx             — Loading shimmer animation
 ├── feedback/
-│   └── Toast.tsx              — Auto-dismiss notification (success/error/info)
-└── charts/
-    ├── BarChart.tsx           — Chart.js bar chart for skill breakdown
-    └── RadarChart.tsx         — Chart.js radar chart for performance overview
+│   └── Toast.tsx               — Auto-dismiss notification (success/error/info)
+├── charts/
+│   ├── BarChart.tsx            — Chart.js bar chart for skill breakdown
+│   └── RadarChart.tsx          — Chart.js radar chart for performance overview
+└── ui/                         — shadcn/ui base components (25+ components)
+    ├── accordion.tsx, alert.tsx, avatar.tsx, badge.tsx
+    ├── button.tsx, button-group.tsx, card.tsx, carousel.tsx
+    ├── collapsible.tsx, command.tsx, dialog.tsx, dropdown-menu.tsx
+    ├── hover-card.tsx, input.tsx, input-group.tsx, popover.tsx
+    ├── progress.tsx, scroll-area.tsx, select.tsx, separator.tsx
+    ├── spinner.tsx, switch.tsx, tabs.tsx, textarea.tsx, tooltip.tsx
+    └── ... (base-nova style via shadcn CLI)
 ```
 
 ## Deployment
