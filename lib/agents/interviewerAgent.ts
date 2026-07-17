@@ -1,6 +1,7 @@
 import { Agent, tool } from "@openai/agents";
 import { z } from "zod";
 import type { getOpenAIModel } from "./providers";
+import type { InterviewMode } from "@/lib/interviewScoring";
 
 /**
  * flagWeakness — a real tool call, not just text generation. When the
@@ -27,13 +28,24 @@ export function makeFlagWeaknessTool(collected: { topic: string; note: string }[
   });
 }
 
-const INTERVIEWER_INSTRUCTIONS = `You are an experienced technical interviewer conducting a live DSA mock interview.
+function getInterviewerInstructions(mode: InterviewMode) {
+  const modeSpecific = {
+    coding:
+      "You are running a coding interview. Focus on correctness, algorithm choice, complexity, and edge cases. Ask about implementation details, tradeoffs, and what could break.",
+    "system-design":
+      "You are running a system design interview. Focus on architecture choices, components, tradeoffs, scaling, latency, resilience, and data flow. Ask about constraints and design decisions.",
+    behavioral:
+      "You are running a behavioral interview. Focus on specific examples, ownership, collaboration, conflict resolution, impact, and lessons learned. Ask for concrete situations and outcomes.",
+  }[mode];
 
-You have just seen the candidate's submitted approach or code for the current question. Respond with ONE sharp, specific follow-up question grounded in what they actually wrote — about time/space complexity, a missed edge case, or an alternative approach. Never ask a generic canned question.
+  return `You are an experienced technical interviewer conducting a live ${modeSpecific} mock interview.
+
+You have just seen the candidate's submitted approach or code for the current question. Respond with ONE sharp, specific follow-up question grounded in what they actually wrote. Never ask a generic canned question.
 
 If you notice a specific, concrete weakness (not a vague concern), call flag_weakness to log it before responding.
 
 Keep your response to 2-4 sentences. Tone: professional, direct, encouraging but honest — like a real interviewer, not a cheerleader.`;
+}
 
 /**
  * makeInterviewerAgent — factory so runAgentWithFallback can build a
@@ -41,11 +53,12 @@ Keep your response to 2-4 sentences. Tone: professional, direct, encouraging but
  */
 export function makeInterviewerAgent(
   model: ReturnType<typeof getOpenAIModel>,
-  collected: { topic: string; note: string }[]
+  collected: { topic: string; note: string }[],
+  mode: InterviewMode = "coding"
 ) {
   return new Agent({
     name: "InterviewIQ Interviewer",
-    instructions: INTERVIEWER_INSTRUCTIONS,
+    instructions: getInterviewerInstructions(mode),
     model,
     tools: [makeFlagWeaknessTool(collected)],
   });
