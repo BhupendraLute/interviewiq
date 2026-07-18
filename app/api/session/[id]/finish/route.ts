@@ -24,6 +24,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({
       ok: true,
       report: {
+        overallScore: report.overallScore,
+        correctnessScore: report.correctnessScore,
+        complexityScore: report.complexityScore,
+        communicationScore: report.communicationScore,
         correctnessNotes: report.correctnessNotes,
         complexityNotes: report.complexityNotes,
         communicationNotes: report.communicationNotes,
@@ -62,6 +66,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     await db.insert(feedbackReports).values({
       sessionId,
+      overallScore: Math.round(finalOutput.overallScore),
+      correctnessScore: Math.round(finalOutput.correctnessScore),
+      complexityScore: Math.round(finalOutput.complexityScore),
+      communicationScore: Math.round(finalOutput.communicationScore),
       correctnessNotes: finalOutput.correctnessNotes,
       complexityNotes: finalOutput.complexityNotes,
       communicationNotes: finalOutput.communicationNotes,

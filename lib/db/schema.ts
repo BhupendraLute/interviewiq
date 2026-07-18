@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, jsonb, integer } from "drizzle-orm/pg-core";
 
 /**
  * sessions — one row per interview attempt, keyed by an anonymous
@@ -35,6 +35,10 @@ export const feedbackReports = pgTable("feedback_reports", {
   sessionId: uuid("session_id")
     .notNull()
     .references(() => sessions.id, { onDelete: "cascade" }),
+  overallScore: integer("overall_score").default(0).notNull(),
+  correctnessScore: integer("correctness_score").default(0).notNull(),
+  complexityScore: integer("complexity_score").default(0).notNull(),
+  communicationScore: integer("communication_score").default(0).notNull(),
   correctnessNotes: text("correctness_notes"),
   complexityNotes: text("complexity_notes"),
   communicationNotes: text("communication_notes"),

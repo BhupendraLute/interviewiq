@@ -22,6 +22,10 @@ export type RespondResult = {
 };
 
 export type FeedbackReport = {
+  overallScore: number;
+  correctnessScore: number;
+  complexityScore: number;
+  communicationScore: number;
   correctnessNotes: string;
   complexityNotes: string;
   communicationNotes: string;
