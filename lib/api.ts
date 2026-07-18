@@ -52,12 +52,14 @@ export async function createSession(
 export async function respond(
   sessionId: string,
   message: string,
-  mode?: InterviewMode
+  mode?: InterviewMode,
+  signal?: AbortSignal
 ): Promise<RespondResult> {
   const res = await fetch(`/api/session/${sessionId}/respond`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, mode }),
+    signal,
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
