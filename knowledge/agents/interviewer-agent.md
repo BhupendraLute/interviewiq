@@ -1,54 +1,95 @@
 ---
 title: Interviewer Agent
-description: Real-time interviewer agent that asks probing follow-up questions
+description: Real-time interviewer agent that asks probing follow-up questions across 3 interview modes
 topic: agents
 subtopic: interviewer
 source_file: lib/agents/interviewerAgent.ts
 related:
   - feedback-agent.md
   - ../system/interview-flow.md
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Interviewer Agent
 
 ## Overview
 
-The **Interviewer Agent** is a real-time agent that reads the candidate's answer and generates sharp, specific follow-up questions. It's the active voice in the interview — it probes for weaknesses using the `flag_weakness` tool.
+The **Interviewer Agent** is a real-time agent that reads the candidate's answer and generates sharp, specific follow-up questions. It's the active voice in the interview — it probes for weaknesses using the `flag_weakness` tool. The agent adapts its behavior to 3 interview modes: **coding**, **system-design**, and **behavioral**.
 
 ## Architecture
 
 ```
-Transcript (full history)
+Transcript (full history) + Mode (coding | system-design | behavioral)
     │
     ▼
-InterviewerAgent (initialized fresh each turn)
+looksLikeCode(answer) → boolean (detects code in answer)
+    │
+    ▼
+InterviewerAgent (initialized fresh each turn, mode-aware)
     │
     ├─> Reads candidate's latest answer
-    ├─> Analyzes for gaps
+    ├─> Selects mode-specific instructions
+    ├─> If code detected: probes implementation details
     ├─> Optionally calls flag_weakness()
     └─> Generates 2-4 sentence follow-up
         │
-        └─> Response sent to user, flagged weaknesses saved
+        └─> Response sent to user, flagged weaknesses collected in-memory
 ```
 
-## Instructions
+## Mode-Specific Instructions
+
+The agent's instructions are dynamically built based on interview mode:
 
 ```
-You are an experienced technical interviewer conducting a live DSA mock interview.
+You are an experienced technical interviewer conducting a live ${mode} mock interview.
 
-You have just seen the candidate's submitted approach or code for the 
-current question. Respond with ONE sharp, specific follow-up question 
-grounded in what they actually wrote — about time/space complexity, 
-a missed edge case, or an alternative approach. Never ask a generic 
-canned question.
+You have just seen the candidate's submitted approach or code for the
+current question. Respond with ONE sharp, specific follow-up question
+grounded in what they actually wrote. Never ask a generic canned question.
 
-If you notice a specific, concrete weakness (not a vague concern), 
+Coding mode:
+  "Focus on correctness, algorithm choice, complexity, and edge cases.
+   Ask about implementation details, tradeoffs, and what could break."
+
+System Design mode:
+  "Focus on architecture choices, components, tradeoffs, scaling,
+   latency, resilience, and data flow. Ask about constraints and
+   design decisions."
+
+Behavioral mode:
+  "Focus on specific examples, ownership, collaboration, conflict
+   resolution, impact, and lessons learned. Ask for concrete situations
+   and outcomes."
+
+If code detected:
+  "The candidate just shared code or pseudocode. Probe implementation
+   details, edge cases, performance, or how the solution behaves on
+   tricky inputs."
+Otherwise:
+  "Focus on the strongest concrete gap in their reasoning."
+
+If you notice a specific, concrete weakness (not a vague concern),
 call flag_weakness to log it before responding.
 
-Keep your response to 2-4 sentences. Tone: professional, direct, 
+Keep your response to 2-4 sentences. Tone: professional, direct,
 encouraging but honest — like a real interviewer, not a cheerleader.
 ```
+
+## Code Detection: `looksLikeCode()`
+
+```typescript
+export function looksLikeCode(answer: string): boolean {
+  const codeSignals = [
+    "function ", "const ", "let ", "var ",
+    "class ", "=>", "return ", "if (", "for (",
+    "while (", "console.log", "{", "}", ";",
+    "import ", "export ", "def ", "public static", "private",
+  ];
+  return codeSignals.some((signal) => answer.toLowerCase().includes(signal));
+}
+```
+
+When code is detected, the agent shifts its follow-up to implementation-level details rather than high-level approach.
 
 ## The `flag_weakness` Tool
 
@@ -68,6 +109,27 @@ flag_weakness(
 | `topic` | string | Short label for the weakness | "time complexity" |
 | `note` | string | One sentence on what was missed | "Claimed O(n) but wrote O(n²)" |
 
+### How It Works
+
+The tool is created via a factory that captures weaknesses into an in-memory array:
+
+```typescript
+export function makeFlagWeaknessTool(collected: { topic: string; note: string }[]) {
+  return tool({
+    name: "flag_weakness",
+    description: "Log a specific weakness or gap...",
+    parameters: z.object({
+      topic: z.string().describe("Short label, e.g. 'time complexity'"),
+      note: z.string().describe("One sentence on what was missed"),
+    }),
+    async execute({ topic, note }) {
+      collected.push({ topic, note });
+      return `Logged: ${topic}`;
+    },
+  });
+}
+```
+
 ### When to Call
 
 - **Do call** when there's a **concrete, specific gap**:
@@ -75,38 +137,28 @@ flag_weakness(
   - Missed edge case (no null check, doesn't handle empty array)
   - Logical error (off-by-one in loop, wrong base case)
   - Incomplete solution (ignores part of problem statement)
+  - Missing STAR structure (behavioral mode)
+  - No tradeoff discussion (system design mode)
 
 - **Don't call** for:
   - Vague concerns ("could be cleaner")
   - Minor style issues ("variable naming")
-  - Things they're about to address ("you'll need to think about edge cases")
+  - Things they're about to address
 
 ### Example Calls
 
 ```typescript
-// Gap: Complexity mismatch
-flag_weakness(
-  topic: "time complexity",
-  note: "Claimed O(n) but nested loop is O(n²)"
-)
+// Coding: Complexity mismatch
+flag_weakness({ topic: "time complexity", note: "Claimed O(n) but nested loop is O(n²)" })
 
-// Gap: Missing edge case
-flag_weakness(
-  topic: "edge case: null input",
-  note: "No check for null before accessing element"
-)
+// Coding: Missing edge case
+flag_weakness({ topic: "edge case: null input", note: "No check for null before accessing element" })
 
-// Gap: Wrong data structure
-flag_weakness(
-  topic: "data structure choice",
-  note: "Array lookup is O(n), should use hash map for O(1)"
-)
+// System Design: Missing tradeoff
+flag_weakness({ topic: "database choice", note: "SQL vs NoSQL tradeoff not discussed" })
 
-// Gap: Incorrect algorithm
-flag_weakness(
-  topic: "algorithm: recursion depth",
-  note: "Recursive solution will hit stack overflow for large inputs"
-)
+// Behavioral: Missing STAR
+flag_weakness({ topic: "STAR structure", note: "Answer lacks specific situation and measurable outcome" })
 ```
 
 ## Execution Context
@@ -116,7 +168,8 @@ flag_weakness(
 The agent receives:
 - **Full transcript** of all prior messages (context window)
 - **Latest user message** (candidate's answer)
-- **Question details** (title, prompt, difficulty)
+- **Mode** (`"coding" | "system-design" | "behavioral"`)
+- **Code detection boolean** (whether answer looks like code)
 
 ### Output
 
@@ -124,15 +177,37 @@ The agent returns:
 - **Weaknesses flagged** (0 or more calls to `flag_weakness()`)
 - **Response text** (2-4 sentences, a follow-up question)
 
+### Factory Pattern
+
+The agent is created fresh per request using a factory:
+
+```typescript
+export function makeInterviewerAgent(
+  model: ReturnType<typeof getOpenAIModel>,
+  collected: { topic: string; note: string }[],
+  mode: InterviewMode = "coding",
+  isCodeAnswer = false
+) {
+  return new Agent({
+    name: "InterviewIQ Interviewer",
+    instructions: getInterviewerInstructions(mode, isCodeAnswer),
+    model,
+    tools: [makeFlagWeaknessTool(collected)],
+  });
+}
+```
+
+This factory pattern is essential for the fallback strategy — a second agent is constructed bound to OpenRouter when OpenAI fails.
+
 ### Fallback & Retries
 
-- If OpenAI quota exhausted → fallback to OpenRouter
+- If OpenAI quota exhausted → fallback to OpenRouter (rebuild agent with OpenRouter model)
 - If response timeout (15s) → return error to user
-- If invalid schema → validate and retry once
+- See `runAgentWithFallback()` in `lib/agents/runWithFallback.ts`
 
 ## Behavior Examples
 
-### Example 1: Correct Approach, Missing Complexity
+### Example 1: Coding — Correct Approach, Missing Complexity
 
 **User submits:**
 ```
@@ -140,16 +215,9 @@ The agent returns:
 then iterate through and check if target - num exists."
 ```
 
-**Agent thinks:**
-- ✓ Correct approach
-- ✗ No mention of space complexity
-
 **Agent calls:**
 ```
-flag_weakness(
-  topic: "space complexity",
-  note: "Didn't mention the O(n) space trade-off"
-)
+flag_weakness({ topic: "space complexity", note: "Didn't mention the O(n) space trade-off" })
 ```
 
 **Agent responds:**
@@ -159,93 +227,70 @@ Walk me through the space complexity —
 and how does it compare to a brute force solution?"
 ```
 
----
-
-### Example 2: Logical Error in Code
-
-**User submits:**
-```javascript
-for (let i = 0; i < arr.length; i++) {
-  if (arr[i] === target) return i;
-}
-return -1;
-```
-
-**User also says:**
-```
-"This searches for the target and returns -1 if not found. 
-Handles all cases."
-```
-
-**Agent thinks:**
-- Wait, the user said "handles all cases" but...
-- Empty array: loop doesn't run, returns -1 ✓
-- Target not found: returns -1 ✓
-- But what if target is first element? Returns 0 ✓
-- Actually, this looks correct...
-- Hmm, let me ask about what they'd do with duplicates.
-
-**Agent responds:**
-```
-"Looks right for single occurrence. 
-What if the target appears multiple times? 
-Would your current approach handle that differently, 
-or would you need to modify it?"
-```
-
-(No flag called — no concrete gap yet, just probing.)
-
----
-
-### Example 3: Edge Case Not Considered
+### Example 2: System Design — Missing Tradeoffs
 
 **User submits:**
 ```
-"For a linked list reversal, I'd iterate through 
-and swap pointers."
+"I'd use PostgreSQL to store URLs and generate short IDs with a hash function."
 ```
 
 **Agent thinks:**
-- ✓ Correct high-level approach
-- ✗ But what about empty list? Null pointer?
+- ✓ Core component identified
+- ✗ What about read/write ratio?
+- ✗ No mention of caching or CDN
 
 **Agent calls:**
 ```
-flag_weakness(
-  topic: "edge case: empty list",
-  note: "No mention of handling null or empty input"
-)
+flag_weakness({ topic: "caching strategy", note: "No discussion of read-heavy vs write-heavy workload or cache layer" })
 ```
 
 **Agent responds:**
 ```
-"Good. Before you code, 
-what are the edge cases you need to handle? 
-Start with: what if the list is empty or has one node?"
+"Good foundation. Let's talk about scale — if you're getting 10K writes/sec, 
+would PostgreSQL alone handle that? Walk me through your caching strategy 
+and how you'd handle hash collisions."
+```
+
+### Example 3: Behavioral — No STAR Structure
+
+**User submits:**
+```
+"I led a project migration and it was successful."
+```
+
+**Agent thinks:**
+- ✓ Good topic
+- ✗ No situation or context
+- ✗ No specific actions taken
+- ✗ No measurable outcome
+
+**Agent calls:**
+```
+flag_weakness({ topic: "STAR structure", note: "Answer lacks situation, specific actions, and measurable results" })
+```
+
+**Agent responds:**
+```
+"Great that it was successful. Can you give me the specifics — 
+what was the situation, what was your role, what concrete actions 
+did you take, and what was the measurable outcome?"
 ```
 
 ---
 
 ## Integration with Feedback Agent
 
-The feedback agent reads:
-- Full transcript
-- All `flag_weakness` calls logged in transcript
-- Uses flagged weaknesses as **concrete evidence** in the report
-
-Example feedback:
-```
-"Weaknesses identified:
- 1. Time complexity — flagged: 'Claimed O(n) but wrote O(n²)'
- 2. Edge cases — flagged: 'No null check before accessing [0]'
-```
+The feedback agent receives:
+- **Full transcript** (formatted as plain text with USER/AI labels)
+- Flagged weaknesses are collected in-memory during the respond cycle but are NOT persisted to the database
+- The feedback agent independently analyzes the transcript text
 
 ---
 
 ## Model Selection
 
-- **Primary**: OpenAI (GPT-4 or similar)
-- **Fallback**: OpenRouter (same model family)
+- **Primary**: OpenAI `gpt-4o-mini` (configurable via OPENAI_MODEL env var)
+- **Fallback**: OpenRouter `meta-llama/llama-3.1-8b-instruct:free` (configurable via OPENROUTER_MODEL)
 - **Cost**: ~$0.10–0.30 per interview (typical 6–10 agent calls)
 
 ---
@@ -266,9 +311,11 @@ Example feedback:
 **File**: [lib/agents/interviewerAgent.ts](../../lib/agents/interviewerAgent.ts)
 
 Key functions:
-- `makeFlagWeaknessTool(collected)` — creates the tool
-- `makeInterviewerAgent(model, collected)` — factory for agent instance
+- `makeFlagWeaknessTool(collected)` — creates the flag_weakness tool
+- `looksLikeCode(answer)` — detects code in candidate answers
+- `getInterviewerInstructions(mode, isCodeAnswer)` — builds mode-aware instructions
+- `makeInterviewerAgent(model, collected, mode, isCodeAnswer)` — factory for agent instance
 
 Used by:
-- [lib/agents/runWithFallback.ts](../../lib/agents/runWithFallback.ts) — wraps agent call with fallback logic
+- [lib/agents/runWithFallback.ts](../../lib/agents/runWithFallback.ts) — wraps agent with fallback logic
 - [app/api/session/[id]/respond/route.ts](../../app/api/session/%5Bid%5D/respond/route.ts) — calls agent on each user message

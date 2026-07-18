@@ -4,9 +4,9 @@ description: Hard difficulty DSA questions for mock interviews
 topic: questions
 subtopic: hard
 difficulty: hard
-count: 2
+count: 3
 source_file: lib/questions.ts
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Hard DSA Questions
@@ -62,23 +62,6 @@ const lengthOfLIS = (nums) => {
 };
 ```
 
-**Naive Approach (O(n²))**:
-```javascript
-const lengthOfLIS = (nums) => {
-  const dp = new Array(nums.length).fill(1);
-  
-  for (let i = 1; i < nums.length; i++) {
-    for (let j = 0; j < i; j++) {
-      if (nums[j] < nums[i]) {
-        dp[i] = Math.max(dp[i], dp[j] + 1);
-      }
-    }
-  }
-  
-  return Math.max(...dp);
-};
-```
-
 ### Common Mistakes
 
 - DP approach without binary search optimization (O(n²))
@@ -91,89 +74,129 @@ const lengthOfLIS = (nums) => {
 1. Can you optimize from O(n²) to O(n log n)? How?
 2. How would you modify it to return the actual sequence, not just length?
 3. What if you want strictly increasing vs. non-decreasing?
-4. Space-time trade-offs?
 
 ---
 
-## Question 2: Trapping Rain Water (2D - Matrix)
+## Question 2: Merge K Sorted Lists
 
 ### Prompt
 
-> Given a 2D matrix where each cell represents the height of a bar, calculate how much rain water can be trapped after raining. Water can flow in all four directions and gets trapped between higher bars.
+> You have k sorted linked lists. How would you merge them into a single sorted list efficiently?
 
 ### Key Concepts
 
-- 2D array traversal
 - Priority queues / heap
-- Multi-directional boundary tracking
-- Advanced graph algorithms
+- Linked list manipulation
+- Divide and conquer
+- K-way merge
+
+### Optimal Solutions
+
+**Approach 1: Min-Heap (O(n log k))**
+**Time**: O(n log k), **Space**: O(k)
+
+```javascript
+const mergeKLists = (lists) => {
+  const minHeap = new MinPriorityQueue({ priority: (node) => node.val });
+  const dummy = new ListNode(0);
+  let current = dummy;
+  
+  for (const list of lists) {
+    if (list) minHeap.enqueue(list);
+  }
+  
+  while (!minHeap.isEmpty()) {
+    const node = minHeap.dequeue().element;
+    current.next = node;
+    current = current.next;
+    if (node.next) minHeap.enqueue(node.next);
+  }
+  
+  return dummy.next;
+};
+```
+
+**Approach 2: Divide & Conquer (O(n log k))**
+Recursively merge pairs of lists.
+
+### Common Mistakes
+
+- Not using a heap (comparing all k heads each iteration = O(nk))
+- Forgetting to advance the pointer after extracting min
+- Not handling empty lists in the input array
+- Space complexity of recursive D&C approach
+
+### Follow-up Questions
+
+1. Compare heap vs divide & conquer approaches
+2. What if the lists are on different machines (distributed)?
+3. How would you handle very large lists that don't fit in memory?
+
+---
+
+## Question 3: Word Ladder
+
+### Prompt
+
+> Given a start word, an end word, and a dictionary of words, how would you find the shortest transformation sequence where each step changes exactly one letter and the result must be a valid word?
+
+### Key Concepts
+
+- BFS on implicit graph
+- Shortest path in unweighted graph
+- Pattern/replacement word mapping
+- Bidirectional BFS optimization
 
 ### Optimal Solution
 
-**Time**: O(m × n × log(m × n)) using min-heap
-**Space**: O(m × n)
+**Time**: O(M² × N) where M = word length, N = word count
+**Space**: O(M × N)
 
 ```javascript
-const trapRainWater = (heightMap) => {
-  if (!heightMap || heightMap.length < 3 || heightMap[0].length < 3) {
-    return 0;
-  }
+const ladderLength = (beginWord, endWord, wordList) => {
+  const wordSet = new Set(wordList);
+  if (!wordSet.has(endWord)) return 0;
   
-  const m = heightMap.length;
-  const n = heightMap[0].length;
-  const visited = Array.from({ length: m }, () => new Array(n).fill(false));
+  const queue = [beginWord];
+  let level = 1;
+  const visited = new Set([beginWord]);
   
-  // Min-heap: [height, row, col]
-  const heap = new MinPriorityQueue();
-  
-  // Add border cells to heap
-  for (let i = 0; i < m; i++) {
-    for (let j = 0; j < n; j++) {
-      if (i === 0 || i === m - 1 || j === 0 || j === n - 1) {
-        heap.enqueue([heightMap[i][j], i, j], heightMap[i][j]);
-        visited[i][j] = true;
-      }
-    }
-  }
-  
-  let water = 0;
-  const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
-  let maxHeight = 0;
-  
-  while (!heap.isEmpty()) {
-    const [height, i, j] = heap.dequeue().element;
-    maxHeight = Math.max(maxHeight, height);
+  while (queue.length > 0) {
+    const levelSize = queue.length;
     
-    for (const [di, dj] of directions) {
-      const ni = i + di;
-      const nj = j + dj;
+    for (let i = 0; i < levelSize; i++) {
+      const word = queue.shift();
+      if (word === endWord) return level;
       
-      if (ni >= 0 && ni < m && nj >= 0 && nj < n && !visited[ni][nj]) {
-        water += Math.max(0, maxHeight - heightMap[ni][nj]);
-        heap.enqueue([heightMap[ni][nj], ni, nj], heightMap[ni][nj]);
-        visited[ni][nj] = true;
+      for (let j = 0; j < word.length; j++) {
+        for (let c = 97; c <= 122; c++) {
+          const newWord = word.slice(0, j) + String.fromCharCode(c) + word.slice(j + 1);
+          if (wordSet.has(newWord) && !visited.has(newWord)) {
+            visited.add(newWord);
+            queue.push(newWord);
+          }
+        }
       }
     }
+    level++;
   }
   
-  return water;
+  return 0;
 };
 ```
 
 ### Common Mistakes
 
-- Using 1D rain water logic (not considering 2D flow)
-- Not recognizing it as a boundary/priority queue problem
-- Incorrect heap implementation or ordering
-- Not tracking visited cells (infinite loops)
-- Off-by-one errors in matrix bounds
+- Using DFS instead of BFS (BFS guarantees shortest path)
+- Not pre-processing the word list into a set for O(1) lookup
+- Skipping bidirectional BFS optimization for large dictionaries
+- Not checking if endWord is in wordList before starting
 
 ### Follow-up Questions
 
-1. What's the intuition behind the boundary-first approach?
-2. How would you solve this without a heap (if space was critical)?
-3. Can you extend this to 3D?
-4. What if water could flow in 8 directions (diagonals)?
+1. How would you optimize with bidirectional BFS?
+2. What if you need to return the actual path, not just length?
+3. How does performance scale with word length and dictionary size?
 
 ---
 
@@ -185,7 +208,7 @@ const trapRainWater = (heightMap) => {
 - ✓ Correct approach identified (may need hints)
 - ✓ Correct complexity analysis
 - ✓ Code runs without major errors
-- ✓ Handles edge cases (empty matrix, small matrices, etc.)
+- ✓ Handles edge cases
 - ✓ Clear communication of algorithm
 
 **Strong Performance**:
@@ -194,7 +217,6 @@ const trapRainWater = (heightMap) => {
 - ✓ Proactive trade-off discussion
 - ✓ Clean, production-ready code
 - ✓ Handles follow-ups well
-- ✓ Explains intuition behind optimization
 
 ---
 
@@ -205,14 +227,14 @@ const trapRainWater = (heightMap) => {
 1. **Don't panic** — hard questions often look unsolvable at first
 2. **Start with brute force** — get a working solution, then optimize
 3. **Think out loud** — interviewer wants to see your thought process
-4. **Draw it out** — use paper/whiteboard for 2D problems
+4. **Draw it out** — use paper/whiteboard for graph problems
 5. **Test as you go** — verify logic on simple examples
 
 ### Communication
 
 - "I see this is related to X problem..."
 - "The naive approach would be O(n²). Let me think of a better way..."
-- "I'm going to use a heap/DP because..."
+- "I'm going to use a heap/DP/BFS because..."
 - "Here's my optimization: instead of O(n²), we can do O(n log n) by..."
 
 ### Time Management
@@ -226,9 +248,12 @@ If you run out of time, **explain** the optimization even if you can't code it.
 
 ---
 
+## Importing Custom Questions
+
+Import your own hard questions via CSV or JSON at `POST /api/session/start`. See [easy-questions.md](easy-questions.md) for format details.
+
 ## Resources for Hard Problems
 
 - LeetCode Hard section (150+ problems)
 - CTCI Chapter 16–17 (dynamic programming, advanced)
 - Competitive programming sites (Codeforces, AtCoder)
-- System design interviews (different hard, but useful skills)

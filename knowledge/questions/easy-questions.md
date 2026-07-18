@@ -6,7 +6,7 @@ subtopic: easy
 difficulty: easy
 count: 3
 source_file: lib/questions.ts
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Easy DSA Questions
@@ -158,6 +158,24 @@ const reverseList = (head) => {
 3. What's the space complexity of the recursive approach?
 
 ---
+
+## Importing Custom Questions
+
+InterviewIQ supports importing your own questions via CSV or JSON at API request time:
+
+```csv
+title,prompt,difficulty,topic
+"FizzBuzz","Write a function that prints numbers 1-100...","easy","arrays"
+"Palindrome Check","Check if a string is a palindrome...","easy","strings"
+```
+
+```json
+[
+  { "title": "FizzBuzz", "prompt": "Write a function...", "difficulty": "easy", "topic": "arrays" }
+]
+```
+
+Pass the `questions` field to `POST /api/session/start`.
 
 ## Difficulty Notes
 
