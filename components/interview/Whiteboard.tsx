@@ -25,6 +25,56 @@ import {
   DownloadIcon,
   PaletteIcon,
 } from "lucide-react";
+import { useSyncExternalStore } from "react";
+
+function isDark() {
+  return typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+}
+
+const subscribe = (cb: () => void) => {
+  const observer = new MutationObserver(cb);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  return () => observer.disconnect();
+};
+
+const LIGHT_BG = "#ffffff";
+const DARK_BG = "#1e1e2e";
+
+const LIGHT_COLORS = [
+  "#0f172a",
+  "#ef4444",
+  "#f59e0b",
+  "#10b981",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+];
+
+const DARK_COLORS = [
+  "#e2e8f0",
+  "#ef4444",
+  "#f59e0b",
+  "#10b981",
+  "#60a5fa",
+  "#a78bfa",
+  "#f472b6",
+];
+
+const COLOR_MAP = new Map<string, string>();
+for (let i = 0; i < Math.max(LIGHT_COLORS.length, DARK_COLORS.length); i++) {
+  if (LIGHT_COLORS[i] && DARK_COLORS[i]) {
+    COLOR_MAP.set(LIGHT_COLORS[i], DARK_COLORS[i]);
+    COLOR_MAP.set(DARK_COLORS[i], LIGHT_COLORS[i]);
+  }
+}
+
+function remapColor(c: string, toDark: boolean): string {
+  const mapped = COLOR_MAP.get(c);
+  if (!mapped) return c;
+  // Only remap if it matches the source palette
+  const isSrcDark = !LIGHT_COLORS.includes(c);
+  return isSrcDark === toDark ? c : mapped;
+}
 
 type Point = { x: number; y: number };
 
@@ -40,21 +90,16 @@ type Stroke =
 
 export type WhiteboardTool = "pen" | "eraser" | "line" | "rect" | "ellipse";
 
-const COLORS = [
-  "#0f172a",
-  "#ef4444",
-  "#f59e0b",
-  "#10b981",
-  "#3b82f6",
-  "#8b5cf6",
-  "#ec4899",
-];
-
 export type WhiteboardProps = {
   className?: string;
 };
 
 export function Whiteboard({ className }: WhiteboardProps) {
+  const dark = useSyncExternalStore(subscribe, isDark, () => false);
+
+  const bgColor = dark ? DARK_BG : LIGHT_BG;
+  const colors = dark ? DARK_COLORS : LIGHT_COLORS;
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const strokesRef = useRef<Stroke[]>([]);
@@ -63,7 +108,7 @@ export function Whiteboard({ className }: WhiteboardProps) {
   const currentRef = useRef<Stroke | null>(null);
 
   const [tool, setTool] = useState<WhiteboardTool>("pen");
-  const [color, setColor] = useState(COLORS[0]);
+  const [color, setColor] = useState(colors[0]);
   const [width, setWidth] = useState(3);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -88,7 +133,7 @@ export function Whiteboard({ className }: WhiteboardProps) {
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, w, h);
 
     const all = currentRef.current
@@ -96,7 +141,7 @@ export function Whiteboard({ className }: WhiteboardProps) {
       : strokesRef.current;
 
     for (const stroke of all) {
-      ctx.strokeStyle = stroke.type === "eraser" ? "#ffffff" : stroke.color;
+      ctx.strokeStyle = stroke.type === "eraser" ? bgColor : stroke.color;
       ctx.fillStyle = ctx.strokeStyle;
       ctx.lineWidth = stroke.width;
       ctx.lineCap = "round";
@@ -138,7 +183,7 @@ export function Whiteboard({ className }: WhiteboardProps) {
         ctx.stroke();
       }
     }
-  }, []);
+  }, [bgColor]);
 
   useEffect(() => {
     render();
@@ -158,6 +203,31 @@ export function Whiteboard({ className }: WhiteboardProps) {
       observer?.disconnect();
     };
   }, [render]);
+
+  // Track previous dark value to detect theme switches
+  const prevDarkRef = useRef(dark);
+  useEffect(() => {
+    const prev = prevDarkRef.current;
+    if (prev !== dark) {
+      const mapStroke = (s: Stroke): Stroke => {
+        const newColor = remapColor(s.color, dark);
+        return s.type === "pen" || s.type === "eraser"
+          ? { ...s, color: newColor }
+          : { ...s, color: newColor };
+      };
+      strokesRef.current = strokesRef.current.map(mapStroke);
+      redoRef.current = redoRef.current.map(mapStroke);
+      if (currentRef.current) {
+        currentRef.current = mapStroke(currentRef.current);
+      }
+      setColor((c) => remapColor(c, dark));
+      prevDarkRef.current = dark;
+    }
+  }, [dark]);
+
+  useEffect(() => {
+    render();
+  }, [dark, render]);
 
   const getPoint = (e: React.PointerEvent): Point => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -264,7 +334,7 @@ export function Whiteboard({ className }: WhiteboardProps) {
   ];
 
   return (
-    <div className={cn("flex size-full min-h-0 flex-col bg-white", className)}>
+    <div className={cn("flex size-full min-h-0 flex-col bg-white dark:bg-[#1e1e2e]", className)}>
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
         <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
           {tools.map((t) => {
@@ -319,7 +389,7 @@ export function Whiteboard({ className }: WhiteboardProps) {
                 Color
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {COLORS.map((c) => (
+                {colors.map((c) => (
                   <button
                     key={c}
                     type="button"
