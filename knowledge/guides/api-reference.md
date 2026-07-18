@@ -134,9 +134,12 @@ Submit a candidate's answer and get the interviewer's follow-up.
 
 - `mode` field: `"coding"` | `"system-design"` | `"behavioral"` (defaults to `"coding"`)
 - `message` is inserted into `transcript_events` before the agent runs
+- Loads session metadata (`role`, `difficulty`) for context-aware questioning
 - Agent reads full transcript history for context
+- Interviewer agent is created with role-aware, difficulty-aware, mode-aware instructions
+- `flagged` array is reset per provider attempt in the fallback factory callback
 - `flagged` array contains weaknesses the agent spotted this turn (in-memory only, not persisted to DB)
-- `provider` is either `"openai"` or `"openrouter"` (fallback)
+- `provider` is either `"openai"`, `"openrouter"`, or `"opencodezen"` (three-tier fallback)
 
 #### Example
 
@@ -216,10 +219,14 @@ Ends the interview and generates a feedback report.
 ##### Request Body
 
 ```json
-{}
+{
+  "mode": "coding"
+}
 ```
 
-(Empty body)
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `mode` | string | `"coding"` | Interview mode: `"coding"`, `"system-design"`, or `"behavioral"` |
 
 ##### Response
 
@@ -252,10 +259,11 @@ Ends the interview and generates a feedback report.
 
 ##### Notes
 
-- Updates session status to `"completed"`
+- Loads session metadata (`role`, `difficulty`) from the sessions table for context-aware feedback
+- `mode` from request body drives which feedback dimensions are emphasized
 - Formats transcript as `USER: ...\n\nAI: ...` text
-- Feedback agent generates Zod-validated structured output
-- Result saved to `feedback_reports` table
+- Feedback agent generates Zod-validated structured output (role-aware, difficulty-aware, mode-aware)
+- Feedback is persisted to `feedback_reports` table BEFORE setting session status to `"completed"` — a failure leaves the session in `"in_progress"` for retry
 - Response includes `provider` field indicating which AI handled the request
 
 ##### Example

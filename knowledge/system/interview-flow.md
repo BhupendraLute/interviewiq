@@ -47,9 +47,12 @@ POST /api/session/[id]/respond  { message, mode: "coding" | "system-design" | "b
   │
   ├─> LOAD full transcript history (ordered by createdAt)
   │
+  ├─> LOAD session metadata (role, difficulty) for context-aware questions
+  │
   ├─> DETECT if message contains code via looksLikeCode()
   │
-  ├─> CREATE InterviewerAgent instance (mode-aware instructions)
+  ├─> CREATE InterviewerAgent instance (role-aware, difficulty-aware, mode-aware)
+  │    ├─> flagged array is reset (flagged.length = 0) per provider attempt
   │    ├─> Agent runs against full transcript
   │    ├─> Agent may call flag_weakness(topic, note) for concrete gaps
   │    │   └─> Weakness pushed to in-memory collected[] array
@@ -77,21 +80,23 @@ POST /api/session/[id]/respond  { message, mode: "coding" | "system-design" | "b
 User clicks "End Interview" or timer expires
   │
   ▼
-POST /api/session/[id]/finish
+POST /api/session/[id]/finish  { mode: "coding" | "system-design" | "behavioral" }
   │
-  ├─> UPDATE sessions SET status = "completed"
+  ├─> LOAD session metadata (role, difficulty)
   │
   ├─> LOAD full transcript (all events ordered by createdAt)
   │
   ├─> FORMAT transcript as plain text:
   │    "USER: ...\n\nAI: ...\n\nUSER: ..."
   │
-  ├─> CREATE FeedbackAgent instance
+  ├─> CREATE FeedbackAgent instance (role-aware, difficulty-aware, mode-aware)
   │    ├─> Agent reads formatted transcript
   │    ├─> Agent generates Zod-validated structured output
   │    └─> Return: { correctnessNotes, complexityNotes, communicationNotes, quotedMoments, nextSteps }
   │
   ├─> INSERT feedback_reports into DB
+  │
+  ├─> UPDATE sessions SET status = "completed" (only after feedback succeeds)
   │
   └─> Return report to client:
        ├─ correctnessNotes

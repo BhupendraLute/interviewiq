@@ -38,28 +38,32 @@ InterviewerAgent (initialized fresh each turn, mode-aware)
 
 ## Mode-Specific Instructions
 
-The agent's instructions are dynamically built based on interview mode:
+The agent's instructions are dynamically built based on interview mode, role, and difficulty:
 
 ```
-You are an experienced technical interviewer conducting a live ${mode} mock interview.
+You are an experienced technical interviewer conducting a live ${mode}
+mock interview for a **${role}** position.
+
+Difficulty guidance for ${difficulty}:
+  - easy:     Basic understanding expected, probe for edge cases and clarity
+  - medium:   Expect solid approach, probe for optimization and tradeoffs
+  - hard:     Candidate may need guidance, probe for process and breakdown
 
 You have just seen the candidate's submitted approach or code for the
 current question. Respond with ONE sharp, specific follow-up question
 grounded in what they actually wrote. Never ask a generic canned question.
 
-Coding mode:
+Coding mode (${role}):
   "Focus on correctness, algorithm choice, complexity, and edge cases.
-   Ask about implementation details, tradeoffs, and what could break."
+   Tailor depth to seniority expected of a ${role}."
 
-System Design mode:
+System Design mode (${role}):
   "Focus on architecture choices, components, tradeoffs, scaling,
-   latency, resilience, and data flow. Ask about constraints and
-   design decisions."
+   latency, resilience, and data flow. Align depth with ${role}."
 
-Behavioral mode:
-  "Focus on specific examples, ownership, collaboration, conflict
-   resolution, impact, and lessons learned. Ask for concrete situations
-   and outcomes."
+Behavioral mode (${role}):
+  "Focus on specific past experiences, ownership, collaboration,
+   conflict resolution, impact. Probe for outcomes relevant to ${role}."
 
 If code detected:
   "The candidate just shared code or pseudocode. Probe implementation
@@ -179,25 +183,27 @@ The agent returns:
 
 ### Factory Pattern
 
-The agent is created fresh per request using a factory:
+The agent is created fresh per request using a factory. It now accepts `role` and `difficulty` to tailor questions:
 
 ```typescript
 export function makeInterviewerAgent(
   model: ReturnType<typeof getOpenAIModel>,
   collected: { topic: string; note: string }[],
   mode: InterviewMode = "coding",
-  isCodeAnswer = false
+  isCodeAnswer = false,
+  role = "Software Engineer",
+  difficulty = "medium"
 ) {
   return new Agent({
     name: "InterviewIQ Interviewer",
-    instructions: getInterviewerInstructions(mode, isCodeAnswer),
+    instructions: getInterviewerInstructions(mode, isCodeAnswer, role, difficulty),
     model,
     tools: [makeFlagWeaknessTool(collected)],
   });
 }
 ```
 
-This factory pattern is essential for the fallback strategy — a second agent is constructed bound to OpenRouter when OpenAI fails.
+This factory pattern is essential for the fallback strategy — a second agent is constructed bound to OpenRouter when OpenAI fails. The `flagged` array is reset (`flagged.length = 0`) inside the factory callback on each provider attempt, ensuring every fallback starts with a clean slate.
 
 ### Fallback & Retries
 
