@@ -59,7 +59,7 @@ export default function CreateInterviewPage() {
     <main className="flex-1 flex items-center justify-center px-4 py-16">
       <div className="w-full max-w-lg">
         <div className="text-center mb-10">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br from-blue-500 to-indigo-600 shadow-lg">
             <BotIcon className="size-7 text-white" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Mock Interview</h1>

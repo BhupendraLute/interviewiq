@@ -1,66 +1,28 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, use } from "react";
+import { useEffect, use } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
-import { respond, finishSession, type InterviewMode } from "@/lib/api";
+import { Conversation, ConversationContent } from "@/components/chat/conversation";
 import {
-  Conversation,
-  ConversationContent,
-} from "@/components/ai-elements/conversation";
+  Message, MessageContent, MessageResponse, MessageActions, MessageAction,
+} from "@/components/chat/message";
 import {
-  Message,
-  MessageContent,
-  MessageResponse,
-  MessageActions,
-  MessageAction,
-} from "@/components/ai-elements/message";
-import {
-  PromptInput,
-  PromptInputBody,
-  PromptInputTextarea,
-  PromptInputFooter,
-  PromptInputSubmit,
-  PromptInputProvider,
-  usePromptInputController,
+  PromptInput, PromptInputBody, PromptInputTextarea, PromptInputFooter,
+  PromptInputSubmit, PromptInputProvider, usePromptInputController,
   type PromptInputControllerProps,
-} from "@/components/ai-elements/prompt-input";
-import {
-  Suggestions,
-  Suggestion,
-} from "@/components/ai-elements/suggestion";
-import { Shimmer } from "@/components/ai-elements/shimmer";
+} from "@/components/chat/prompt-input";
+import { Suggestions, Suggestion } from "@/components/chat/suggestion";
+import { Shimmer } from "@/components/chat/shimmer";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useSpeech } from "@/lib/useSpeech";
-import type { EditorLanguage } from "@/components/interview/CodeEditor";
-import { LANGUAGE_LABELS } from "@/components/interview/CodeEditor";
+import { extractCodeBlock, type MobileView, type PanelTab } from "@/lib/interview/types";
+import { useInterviewSession } from "@/hooks/useInterviewSession";
 import {
-  BookOpenIcon,
-  Code2Icon,
-  FlagIcon,
-  GlobeIcon,
-  MessageSquareIcon,
-  MicIcon,
-  MicOffIcon,
-  PanelRightIcon,
-  PanelRightCloseIcon,
-  PenToolIcon,
-  SquareIcon,
-  SparklesIcon,
-  Volume2Icon,
-  VolumeXIcon,
-  XIcon,
+  BookOpenIcon, Code2Icon, FlagIcon, GlobeIcon, MessageSquareIcon,
+  MicIcon, MicOffIcon, PanelRightIcon, PanelRightCloseIcon, PenToolIcon,
+  SquareIcon, SparklesIcon, Volume2Icon, VolumeXIcon, XIcon,
 } from "lucide-react";
 
 const CodeEditor = dynamic(
@@ -80,15 +42,6 @@ const Whiteboard = dynamic(
   { ssr: false }
 );
 
-type ChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-};
-
-type PanelTab = "code" | "whiteboard";
-type MobileView = "chat" | "code" | "whiteboard";
-
 function ControllerBridge({
   onReady,
 }: {
@@ -101,252 +54,22 @@ function ControllerBridge({
   return null;
 }
 
-function extractCodeBlock(text: string): { code: string; lang: string } | null {
-  const match = text.match(/```(\w+)?\n([\s\S]*?)```/);
-  if (!match) return null;
-  return { code: match[2].replace(/\n$/, ""), lang: (match[1] ?? "").toLowerCase() };
-}
-
-function mapLang(lang: string): EditorLanguage {
-  switch (lang) {
-    case "ts":
-    case "typescript":
-      return "typescript";
-    case "py":
-    case "python":
-      return "python";
-    case "java":
-      return "java";
-    case "cpp":
-    case "c++":
-    case "c":
-      return "cpp";
-    case "sql":
-      return "sql";
-    case "js":
-    case "javascript":
-    default:
-      return "javascript";
-  }
-}
-
-const VOICE_LANGS = [
-  { code: "en-US", label: "English (US)" },
-  { code: "en-GB", label: "English (UK)" },
-  { code: "es-ES", label: "Español" },
-  { code: "fr-FR", label: "Français" },
-  { code: "de-DE", label: "Deutsch" },
-  { code: "hi-IN", label: "हिन्दी" },
-  { code: "zh-CN", label: "中文" },
-  { code: "ja-JP", label: "日本語" },
-  { code: "pt-BR", label: "Português" },
-  { code: "ar-SA", label: "العربية" },
-];
-
 export default function InterviewSessionPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id: sessionId } = use(params);
-  const router = useRouter();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isResponding, setIsResponding] = useState(false);
-  const [isFinishing, setIsFinishing] = useState(false);
-  const [mode, setMode] = useState<InterviewMode>("coding");
-  const [flaggedWeaknesses, setFlaggedWeaknesses] = useState<
-    { topic: string; note: string }[]
-  >([]);
-
-  const [panelOpen, setPanelOpen] = useState(true);
-  const [panelTab, setPanelTab] = useState<PanelTab>("code");
-  const [mobileView, setMobileView] = useState<MobileView>("chat");
-
-  const [editorCode, setEditorCode] = useState("");
-  const [editorLanguage, setEditorLanguage] = useState<EditorLanguage>("javascript");
-  const [autoSpeak, setAutoSpeak] = useState(true);
-  const [voiceLang, setVoiceLang] = useState("en-US");
-  const [hintDismissed, setHintDismissed] = useState(true);
-
-  const controllerRef = useRef<PromptInputControllerProps | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const submitTranscriptRef = useRef<(text: string) => void>(() => {});
-
-  const { sttSupported, ttsSupported, listening, speaking, startListening, stopListening, speak, cancelSpeaking } =
-    useSpeech({
-      lang: voiceLang,
-      onInterimTranscript: (transcript) => {
-        controllerRef.current?.textInput.setInput(transcript);
-      },
-      onFinalTranscript: (transcript) => {
-        submitTranscriptRef.current(transcript);
-      },
-    });
-
-  useEffect(() => {
-    const stored = sessionStorage.getItem(`iq_session_${sessionId}`);
-    let resolvedMode: InterviewMode = "coding";
-    if (stored) {
-      const data = JSON.parse(stored);
-      setMessages(data.messages ?? []);
-      resolvedMode = data.mode ?? "coding";
-      setMode(resolvedMode);
-      setFlaggedWeaknesses(data.flagged ?? []);
-      setEditorCode(data.editorCode ?? "");
-      setEditorLanguage(data.editorLanguage ?? "javascript");
-    }
-    // Mode-aware default workspace: whiteboard leads for system design,
-    // behavioral interviews keep the chat full-width by default.
-    setPanelTab(resolvedMode === "system-design" ? "whiteboard" : "code");
-    setPanelOpen(resolvedMode !== "behavioral");
-    setHintDismissed(sessionStorage.getItem("iq_hint_seen") === "1");
-    setIsLoading(false);
-  }, [sessionId]);
-
-  useEffect(() => {
-    if (sessionId && messages.length > 0) {
-      sessionStorage.setItem(
-        `iq_session_${sessionId}`,
-        JSON.stringify({ messages, mode, flagged: flaggedWeaknesses, editorCode, editorLanguage })
-      );
-    }
-  }, [sessionId, messages, mode, flaggedWeaknesses, editorCode, editorLanguage]);
-
-  const openInEditor = useCallback(
-    (content: string) => {
-      const block = extractCodeBlock(content);
-      if (!block) return;
-      setEditorCode(block.code);
-      setEditorLanguage(mapLang(block.lang));
-      setPanelTab("code");
-      setPanelOpen(true);
-      setMobileView("code");
-    },
-    []
-  );
-
-  const handleSubmit = useCallback(
-    async (text: string) => {
-      if (!sessionId || !text.trim() || isResponding) return;
-
-      const userMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "user",
-        content: text,
-      };
-
-      setMessages((prev) => [...prev, userMsg]);
-      setIsResponding(true);
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      try {
-        const result = await respond(sessionId, text, mode, controller.signal);
-
-        if (result.flagged?.length > 0) {
-          setFlaggedWeaknesses((prev) => [...prev, ...result.flagged]);
-        }
-
-        const aiMsg: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: result.reply,
-        };
-        setMessages((prev) => [...prev, aiMsg]);
-
-        if (autoSpeak) {
-          speak(result.reply);
-        }
-      } catch (err) {
-        // Aborted by the user (Stop) — leave the conversation as-is, no error.
-        if (err instanceof DOMException && err.name === "AbortError") {
-          return;
-        }
-        const message =
-          err instanceof Error ? err.message : "Something went wrong. Please try again.";
-        const errorMsg: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: `**Error:** ${message}`,
-        };
-        setMessages((prev) => [...prev, errorMsg]);
-      } finally {
-        abortRef.current = null;
-        setIsResponding(false);
-      }
-    },
-    [sessionId, mode, isResponding, autoSpeak, speak]
-  );
-
-  useEffect(() => {
-    submitTranscriptRef.current = handleSubmit;
-  }, [handleSubmit]);
-
-  const handleStop = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-  }, []);
-
-  const handleFinish = useCallback(async () => {
-    if (!sessionId || isFinishing) return;
-    setIsFinishing(true);
-    try {
-      await finishSession(sessionId, mode);
-      sessionStorage.removeItem(`iq_session_${sessionId}`);
-      router.push(`/interview/${sessionId}/report`);
-    } catch {
-      router.push(`/interview/${sessionId}/report`);
-    }
-  }, [sessionId, router, isFinishing, mode]);
-
-  const handleSuggestion = useCallback(
-    (suggestion: string) => handleSubmit(suggestion),
-    [handleSubmit]
-  );
-
-  const handleMic = useCallback(() => {
-    if (listening) {
-      stopListening();
-    } else {
-      startListening();
-    }
-  }, [listening, stopListening, startListening]);
-
-  const dismissHint = useCallback(() => {
-    setHintDismissed(true);
-    sessionStorage.setItem("iq_hint_seen", "1");
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const typing =
-        !!target &&
-        (target.tagName === "TEXTAREA" ||
-          target.tagName === "INPUT" ||
-          target.isContentEditable);
-
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "m") {
-        e.preventDefault();
-        handleMic();
-        return;
-      }
-      if (e.key === "Escape" && panelOpen && !typing) {
-        setPanelOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleMic, panelOpen]);
-
-  const shareCode = useCallback(() => {
-    if (!editorCode.trim()) return;
-    handleSubmit(
-      `Here is my ${LANGUAGE_LABELS[editorLanguage]} solution:\n\n\`\`\`${editorLanguage}\n${editorCode}\n\`\`\``
-    );
-  }, [editorCode, editorLanguage, handleSubmit]);
+  const {
+    messages, mode, flaggedWeaknesses, isLoading, isResponding, isFinishing,
+    panelOpen, setPanelOpen, panelTab, setPanelTab, mobileView, setMobileView,
+    editorCode, setEditorCode, editorLanguage, setEditorLanguage,
+    autoSpeak, setAutoSpeak, voiceLang, setVoiceLang, hintDismissed,
+    controllerRef,
+    sttSupported, ttsSupported, listening, speaking, speak, cancelSpeaking,
+    handleSubmit, handleStop, handleFinish, handleSuggestion, handleMic, dismissHint, openInEditor, shareCode,
+    VOICE_LANGS,
+  } = useInterviewSession(sessionId);
 
   if (isLoading) {
     return (
@@ -358,7 +81,6 @@ export default function InterviewSessionPage({
 
   return (
     <main className="relative flex flex-col h-[calc(100vh-4rem)] w-full shrink-0 overflow-hidden">
-      {/* Finishing overlay */}
       {isFinishing && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-background/80 backdrop-blur-sm">
           <span className="size-10 animate-spin rounded-full border-[3px] border-indigo-600 border-t-transparent" />
@@ -370,7 +92,7 @@ export default function InterviewSessionPage({
           </p>
         </div>
       )}
-      {/* Toolbar */}
+
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
           <BookOpenIcon className="size-4 shrink-0" />
@@ -407,12 +129,7 @@ export default function InterviewSessionPage({
           )}
 
           {speaking && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={cancelSpeaking}
-              className="gap-1.5 text-indigo-600"
-            >
+            <Button variant="outline" size="sm" onClick={cancelSpeaking} className="gap-1.5 text-indigo-600">
               <SquareIcon className="size-3.5" />
               <span className="hidden sm:inline">Stop</span>
             </Button>
@@ -446,7 +163,6 @@ export default function InterviewSessionPage({
         </div>
       </div>
 
-      {/* Mobile view switch */}
       <div className="flex items-center gap-1 border-b border-border bg-muted/40 px-3 py-2 lg:hidden">
         {(
           [
@@ -479,9 +195,7 @@ export default function InterviewSessionPage({
         })}
       </div>
 
-      {/* Workspace */}
       <div className="flex min-h-0 flex-1">
-        {/* Chat */}
         <section
           className={cn(
             "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
@@ -537,7 +251,6 @@ export default function InterviewSessionPage({
                   </MessageContent>
                 </Message>
               )}
-
             </ConversationContent>
           </Conversation>
 
@@ -549,14 +262,10 @@ export default function InterviewSessionPage({
                   Tip: tap the{" "}
                   <span className="font-medium text-foreground">mic</span> to
                   speak (⌘/Ctrl+M), hit{" "}
-                  <span className="font-medium text-foreground">
-                    Read aloud
-                  </span>{" "}
+                  <span className="font-medium text-foreground">Read aloud</span>{" "}
                   to hear the interviewer, and open the{" "}
                   <span className="font-medium text-foreground">Code</span> /{" "}
-                  <span className="font-medium text-foreground">
-                    Whiteboard
-                  </span>{" "}
+                  <span className="font-medium text-foreground">Whiteboard</span>{" "}
                   panel to show your work.
                 </p>
                 <button
@@ -626,8 +335,7 @@ export default function InterviewSessionPage({
                                   onClick={handleMic}
                                   aria-pressed={listening}
                                   className={cn(
-                                    listening &&
-                                      "bg-red-500 text-white hover:bg-red-500"
+                                    listening && "bg-red-500 text-white hover:bg-red-500"
                                   )}
                                 />
                               }
@@ -693,17 +401,13 @@ export default function InterviewSessionPage({
                                   onClick={() => setAutoSpeak((v) => !v)}
                                   className={cn(
                                     "relative h-5 w-9 rounded-full transition-colors",
-                                    autoSpeak
-                                      ? "bg-primary"
-                                      : "bg-muted-foreground/30"
+                                    autoSpeak ? "bg-primary" : "bg-muted-foreground/30"
                                   )}
                                 >
                                   <span
                                     className={cn(
                                       "absolute top-0.5 size-4 rounded-full bg-background transition-transform",
-                                      autoSpeak
-                                        ? "translate-x-4"
-                                        : "translate-x-0.5"
+                                      autoSpeak ? "translate-x-4" : "translate-x-0.5"
                                     )}
                                   />
                                 </button>
@@ -735,7 +439,6 @@ export default function InterviewSessionPage({
           </div>
         </section>
 
-        {/* Tools panel */}
         <aside
           className={cn(
             "flex min-h-0 min-w-0 flex-col border-border bg-background lg:w-[44%] lg:max-w-170 lg:min-w-95 lg:shrink-0",
@@ -746,10 +449,7 @@ export default function InterviewSessionPage({
           <div className="flex items-center gap-1 border-b border-border px-3 py-2">
             <button
               type="button"
-              onClick={() => {
-                setPanelTab("code");
-                setMobileView("code");
-              }}
+              onClick={() => { setPanelTab("code"); setMobileView("code"); }}
               className={cn(
                 "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
                 panelTab === "code"
@@ -762,10 +462,7 @@ export default function InterviewSessionPage({
             </button>
             <button
               type="button"
-              onClick={() => {
-                setPanelTab("whiteboard");
-                setMobileView("whiteboard");
-              }}
+              onClick={() => { setPanelTab("whiteboard"); setMobileView("whiteboard"); }}
               className={cn(
                 "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
                 panelTab === "whiteboard"

@@ -20,7 +20,7 @@ import {
   RefreshCwIcon,
 } from "lucide-react";
 import Markdown from "react-markdown";
-import { Shimmer } from "@/components/ai-elements/shimmer";
+import { Shimmer } from "@/components/chat/shimmer";
 
 const RadarChart = dynamic(
   () => import("@/components/charts/RadarChart"),
@@ -232,12 +232,12 @@ export default function ReportPage({
 
   return (
     <main className="relative flex-1 overflow-hidden px-4 py-8 md:px-6 md:py-12">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-indigo-50/40 via-transparent to-transparent dark:from-indigo-950/20" />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-violet-50/30 via-transparent to-transparent dark:from-violet-950/10" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_left,var(--tw-gradient-stops))] from-indigo-50/40 via-transparent to-transparent dark:from-indigo-950/20" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_bottom_right,var(--tw-gradient-stops))] from-violet-50/30 via-transparent to-transparent dark:from-violet-950/10" />
       <div className="mx-auto max-w-5xl space-y-8">
         {/* Header */}
         <div className="text-center space-y-3 animate-in fade-in slide-in-from-top-4 duration-700">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/20">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/20">
             <CheckCircleIcon className="size-7 text-white" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">
@@ -249,7 +249,7 @@ export default function ReportPage({
         </div>
 
         {/* Overall Score Hero */}
-        <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-card to-muted/30 p-8 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100 fill-mode-both">
+        <div className="relative overflow-hidden rounded-2xl border bg-linear-to-br from-card to-muted/30 p-8 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100 fill-mode-both">
           <div className="absolute top-0 right-0 -mr-16 -mt-16 size-48 rounded-full bg-indigo-500/5 blur-3xl" />
           <div className="absolute bottom-0 left-0 -ml-16 -mb-16 size-48 rounded-full from-violet-500/5 blur-3xl" />
           <div className="relative grid items-center gap-8 md:grid-cols-[1fr_auto_1fr]">
@@ -316,10 +316,10 @@ export default function ReportPage({
           </div>
           <div className="space-y-4">
             <section className="group relative overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md">
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-400 to-blue-600" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-blue-400 to-blue-600" />
               <div className="p-5">
                 <div className="mb-3 flex items-center gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
                     <TargetIcon className="size-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -344,10 +344,10 @@ export default function ReportPage({
             </section>
 
             <section className="group relative overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md">
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 to-amber-600" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-amber-400 to-amber-600" />
               <div className="p-5">
                 <div className="mb-3 flex items-center gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900">
                     <LightbulbIcon className="size-5 text-amber-600 dark:text-amber-400" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -372,10 +372,10 @@ export default function ReportPage({
             </section>
 
             <section className="group relative overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md">
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-400 to-violet-600" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-violet-400 to-violet-600" />
               <div className="p-5">
                 <div className="mb-3 flex items-center gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-50 to-violet-100 dark:from-violet-950 dark:to-violet-900">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-violet-50 to-violet-100 dark:from-violet-950 dark:to-violet-900">
                     <MessageSquareIcon className="size-5 text-violet-600 dark:text-violet-400" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -408,7 +408,7 @@ export default function ReportPage({
               <QuoteIcon className="size-4 text-muted-foreground" />
               <h2 className="font-semibold text-sm text-muted-foreground">Key Moments</h2>
             </div>
-            <div className="relative space-y-4 before:absolute before:left-[19px] before:top-2 before:h-[calc(100%-24px)] before:w-px before:bg-border">
+            <div className="relative space-y-4 before:absolute before:left-4.75 before:top-2 before:h-[calc(100%-24px)] before:w-px before:bg-border">
               {report.quotedMoments.map((moment, i) => (
                 <div key={i} className="relative flex gap-4 pl-2">
                   <div className="relative z-10 mt-1 flex size-10 shrink-0 items-center justify-center rounded-full border bg-background shadow-xs">
@@ -435,7 +435,7 @@ export default function ReportPage({
         )}
 
         {/* Next Steps */}
-        <section className="rounded-xl border bg-gradient-to-br from-emerald-50/80 to-card p-6 shadow-sm dark:from-emerald-950/10 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-700 fill-mode-both">
+        <section className="rounded-xl border bg-linear-to-br from-emerald-50/80 to-card p-6 shadow-sm dark:from-emerald-950/10 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-700 fill-mode-both">
           <div className="mb-3 flex items-center gap-2">
             <ArrowRightIcon className="size-4 text-emerald-600" />
             <h2 className="font-semibold text-sm">Next Steps</h2>
