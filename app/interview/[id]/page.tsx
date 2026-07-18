@@ -165,7 +165,7 @@ export default function InterviewSessionPage({
 
   const [editorCode, setEditorCode] = useState("");
   const [editorLanguage, setEditorLanguage] = useState<EditorLanguage>("javascript");
-  const [autoSpeak, setAutoSpeak] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(true);
   const [voiceLang, setVoiceLang] = useState("en-US");
   const [hintDismissed, setHintDismissed] = useState(true);
 
@@ -298,13 +298,13 @@ export default function InterviewSessionPage({
     if (!sessionId || isFinishing) return;
     setIsFinishing(true);
     try {
-      await finishSession(sessionId);
+      await finishSession(sessionId, mode);
       sessionStorage.removeItem(`iq_session_${sessionId}`);
       router.push(`/interview/${sessionId}/report`);
     } catch {
       router.push(`/interview/${sessionId}/report`);
     }
-  }, [sessionId, router, isFinishing]);
+  }, [sessionId, router, isFinishing, mode]);
 
   const handleSuggestion = useCallback(
     (suggestion: string) => handleSubmit(suggestion),

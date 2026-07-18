@@ -42,10 +42,22 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 // POST /api/session/[id]/finish — complete session and generate report
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id: sessionId } = await params;
     const db = getDb();
+    const { mode } = await req.json().catch(() => ({ mode: "coding" }));
+
+    // Load session metadata for role-aware, difficulty-aware feedback.
+    const [session] = await db
+      .select({ role: sessions.role, difficulty: sessions.difficulty })
+      .from(sessions)
+      .where(eq(sessions.id, sessionId))
+      .limit(1);
+
+    const role = session?.role ?? "Software Engineer";
+    const difficulty = session?.difficulty ?? "medium";
+    const interviewMode = (mode as string) ?? "coding";
 
     await db.update(sessions).set({ status: "completed" }).where(eq(sessions.id, sessionId));
 
@@ -60,7 +72,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       .join("\n\n");
 
     const { finalOutput, provider } = await runAgentWithFallback<FeedbackReport>(
-      (model) => makeFeedbackAgent(model),
+      (model) => makeFeedbackAgent(model, role, difficulty, interviewMode),
       `Here is the full interview transcript:\n\n${transcriptText}`
     );
 

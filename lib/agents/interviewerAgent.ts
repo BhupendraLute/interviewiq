@@ -55,21 +55,29 @@ export function looksLikeCode(answer: string): boolean {
   return codeSignals.some((signal) => normalized.includes(signal));
 }
 
-function getInterviewerInstructions(mode: InterviewMode, isCodeAnswer: boolean) {
+function difficultyDescriptor(difficulty: string): string {
+  const map: Record<string, string> = {
+    easy: "This is an easy-level question. The candidate should be expected to solve it comfortably. Probe for basic understanding, common edge cases, and whether they can clearly explain their reasoning.",
+    medium: "This is a medium-level question. Expect a solid approach with some nuanced discussion. Probe for optimization awareness, tradeoffs, and less obvious edge cases.",
+    hard: "This is a hard-level question. The candidate may need guidance. Probe for their problem-solving process, how they break down complexity, and whether they can identify optimal approaches even if implementation is partial.",
+  };
+  return map[difficulty] ?? map.medium;
+}
+
+function getInterviewerInstructions(mode: InterviewMode, isCodeAnswer: boolean, role: string, difficulty: string) {
   const modeSpecific = {
-    coding:
-      "You are running a coding interview. Focus on correctness, algorithm choice, complexity, and edge cases. Ask about implementation details, tradeoffs, and what could break.",
-    "system-design":
-      "You are running a system design interview. Focus on architecture choices, components, tradeoffs, scaling, latency, resilience, and data flow. Ask about constraints and design decisions.",
-    behavioral:
-      "You are running a behavioral interview. Focus on specific examples, ownership, collaboration, conflict resolution, impact, and lessons learned. Ask for concrete situations and outcomes.",
+    coding: `You are running a coding interview for a ${role} role. Focus on algorithm correctness, data structure choice, time/space complexity, and edge cases. Tailor your follow-ups to the skills expected of a ${role} — if the role is senior, expect deeper system-level thinking even on coding questions.`,
+    "system-design": `You are running a system design interview for a ${role} role. Focus on architecture decisions, component breakdown, scaling, tradeoffs, data flow, and resilience. Align the depth of your probes with the seniority implied by ${role}.`,
+    behavioral: `You are running a behavioral interview for a ${role} role. Focus on specific past experiences, ownership, collaboration, conflict resolution, impact, and lessons learned. Probe for concrete examples with measurable outcomes relevant to a ${role}.`,
   }[mode];
 
   const codeInstruction = isCodeAnswer
     ? "The candidate just shared code or pseudocode. Probe implementation details, edge cases, performance, or how the solution behaves on tricky inputs."
     : "Focus on the strongest concrete gap in their reasoning.";
 
-  return `You are an experienced technical interviewer conducting a live ${mode} mock interview.
+  return `You are an experienced technical interviewer conducting a live ${mode} mock interview for a **${role}** position.
+
+${difficultyDescriptor(difficulty)}
 
 You have just seen the candidate's submitted approach or code for the current question. Respond with ONE sharp, specific follow-up question grounded in what they actually wrote. Never ask a generic canned question.
 
@@ -89,11 +97,13 @@ export function makeInterviewerAgent(
   model: ReturnType<typeof getOpenAIModel>,
   collected: { topic: string; note: string }[],
   mode: InterviewMode = "coding",
-  isCodeAnswer = false
+  isCodeAnswer = false,
+  role = "Software Engineer",
+  difficulty = "medium"
 ) {
   return new Agent({
     name: "InterviewIQ Interviewer",
-    instructions: getInterviewerInstructions(mode, isCodeAnswer),
+    instructions: getInterviewerInstructions(mode, isCodeAnswer, role, difficulty),
     model,
     tools: [makeFlagWeaknessTool(collected)],
   });

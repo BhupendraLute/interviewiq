@@ -19,6 +19,7 @@ import {
   TrendingUpIcon,
   RefreshCwIcon,
 } from "lucide-react";
+import Markdown from "react-markdown";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 
 const RadarChart = dynamic(
@@ -87,6 +88,44 @@ function ScoreGauge({ score, label, size = "lg" }: { score: number; label: strin
         {label}
       </span>
     </div>
+  );
+}
+
+function MarkdownText({ text }: { text: string }) {
+  return (
+    <Markdown
+      components={{
+        p: ({ children }) => (
+          <p className="text-sm leading-relaxed text-muted-foreground mb-2 last:mb-0">
+            {children}
+          </p>
+        ),
+        ol: ({ children }) => (
+          <ol className="list-decimal pl-5 space-y-1.5 mb-2 last:mb-0">{children}</ol>
+        ),
+        ul: ({ children }) => (
+          <ul className="list-disc pl-5 space-y-1.5 mb-2 last:mb-0">{children}</ul>
+        ),
+        li: ({ children }) => (
+          <li className="text-sm leading-relaxed text-muted-foreground pl-1">{children}</li>
+        ),
+        strong: ({ children }) => (
+          <strong className="font-semibold text-foreground">{children}</strong>
+        ),
+        code: ({ children }) => (
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm font-mono text-foreground">
+            {children}
+          </code>
+        ),
+        blockquote: ({ children }) => (
+          <blockquote className="border-l-2 border-muted-foreground/30 pl-3 italic mb-2 last:mb-0">
+            {children}
+          </blockquote>
+        ),
+      }}
+    >
+      {text}
+    </Markdown>
   );
 }
 
@@ -300,9 +339,7 @@ export default function ReportPage({
                     style={{ width: `${report.correctnessScore ?? 0}%` }}
                   />
                 </div>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {report.correctnessNotes}
-                </p>
+                <MarkdownText text={report.correctnessNotes} />
               </div>
             </section>
 
@@ -330,9 +367,7 @@ export default function ReportPage({
                     style={{ width: `${report.complexityScore ?? 0}%` }}
                   />
                 </div>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {report.complexityNotes}
-                </p>
+                <MarkdownText text={report.complexityNotes} />
               </div>
             </section>
 
@@ -360,9 +395,7 @@ export default function ReportPage({
                     style={{ width: `${report.communicationScore ?? 0}%` }}
                   />
                 </div>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {report.communicationNotes}
-                </p>
+                <MarkdownText text={report.communicationNotes} />
               </div>
             </section>
           </div>
@@ -407,9 +440,7 @@ export default function ReportPage({
             <ArrowRightIcon className="size-4 text-emerald-600" />
             <h2 className="font-semibold text-sm">Next Steps</h2>
           </div>
-          <p className="text-sm text-card-foreground leading-relaxed">
-            {report.nextSteps}
-          </p>
+          <MarkdownText text={report.nextSteps} />
         </section>
 
         {/* Actions */}

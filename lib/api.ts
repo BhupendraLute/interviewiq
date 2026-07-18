@@ -84,10 +84,13 @@ export async function getReport(
 }
 
 export async function finishSession(
-  sessionId: string
+  sessionId: string,
+  mode?: string
 ): Promise<FinishSessionResult> {
   const res = await fetch(`/api/session/${sessionId}/finish`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
