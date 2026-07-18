@@ -43,6 +43,12 @@ export function getOpenAIModel(): OpenAIChatCompletionsModel {
 
 export function getOpenRouterModel(): OpenAIChatCompletionsModel {
   if (_openRouterModel) return _openRouterModel;
+  if (!process.env.OPENROUTER_API_KEY) {
+    throw new Error(
+      "OPENROUTER_API_KEY is not set — cannot create OpenRouter model. " +
+      "Set this environment variable or ensure the provider is properly configured."
+    );
+  }
   const client = new OpenAI({
     apiKey: process.env.OPENROUTER_API_KEY,
     baseURL: "https://openrouter.ai/api/v1",
@@ -57,6 +63,12 @@ export function getOpenRouterModel(): OpenAIChatCompletionsModel {
 
 export function getOpenCodeZenModel(): OpenAIChatCompletionsModel {
   if (_openCodeZenModel) return _openCodeZenModel;
+  if (!process.env.OPENCODEZEN_API_KEY) {
+    throw new Error(
+      "OPENCODEZEN_API_KEY is not set — cannot create OpenCode Zen model. " +
+      "Set this environment variable or ensure the provider is properly configured."
+    );
+  }
   const client = new OpenAI({
     apiKey: process.env.OPENCODEZEN_API_KEY,
     baseURL: "https://opencode.ai/zen/v1",

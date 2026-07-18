@@ -240,7 +240,11 @@ and what measurable outcome came from the migration?"
 
 3. TASK: Generate structured feedback report
 
-4. OUTPUT: Zod-validated structured object
+ 4. OUTPUT: Zod-validated structured object
+   ├─ overallScore: number (0-100)
+   ├─ correctnessScore: number (0-100)
+   ├─ complexityScore: number (0-100)
+   ├─ communicationScore: number (0-100)
    ├─ correctnessNotes: string
    ├─ complexityNotes: string
    ├─ communicationNotes: string

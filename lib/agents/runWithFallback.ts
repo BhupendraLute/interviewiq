@@ -79,8 +79,8 @@ export async function runAgentWithFallback<TOutput = string>(
       console.warn("[runAgentWithFallback] Unrecognized error, attempting OpenRouter fallback:", err.message);
     }
 
-    const openRouterAgent = makeAgent(getOpenRouterModel());
     try {
+      const openRouterAgent = makeAgent(getOpenRouterModel());
       const fallbackResult = await run(openRouterAgent, input);
       return { finalOutput: fallbackResult.finalOutput as TOutput, provider: "openrouter" };
     } catch (openRouterErr: any) {

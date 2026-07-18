@@ -27,7 +27,7 @@ InterviewIQ provides:
 - **3 interview modes** — Coding (DSA), System Design, and Behavioral
 - **Intelligent interviewer agent** — asks real follow-ups based on your actual answer, not generic scripts; adapts to all 3 modes
 - **Structured feedback reports** — quotes specific moments from your conversation instead of generic advice
-- **Anonymous sessions** — no user tracking, identity is a UUID cookie
+- **Pseudonymous sessions** — identity is a UUID cookie for session continuity; no name, email, or login required
 - **CSV / JSON question import** — upload your own question bank
 - **Fallback AI provider** — automatic OpenRouter fallback when OpenAI quota is exhausted
 

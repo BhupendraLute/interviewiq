@@ -107,6 +107,7 @@ export function useSpeech(options: UseSpeechOptions = {}): UseSpeech {
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const finalRef = useRef("");
+  const interimRef = useRef("");
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const onFinalRef = useRef(onFinalTranscript);
   const onInterimRef = useRef(onInterimTranscript);
@@ -135,10 +136,14 @@ export function useSpeech(options: UseSpeechOptions = {}): UseSpeech {
     recognition.onstart = () => setListening(true);
     recognition.onend = () => {
       setListening(false);
-      if (finalRef.current.trim()) {
-        onFinalRef.current?.(finalRef.current.trim());
-        finalRef.current = "";
+      const final = finalRef.current.trim();
+      const interim = interimRef.current.trim();
+      const combined = final + (final && interim ? " " : "") + interim;
+      if (combined) {
+        onFinalRef.current?.(combined);
       }
+      finalRef.current = "";
+      interimRef.current = "";
     };
     recognition.onerror = (event) => {
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
@@ -156,6 +161,7 @@ export function useSpeech(options: UseSpeechOptions = {}): UseSpeech {
           interim += transcript;
         }
       }
+      interimRef.current = interim;
       if (interim) onInterimRef.current?.(interim);
     };
 

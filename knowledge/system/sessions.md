@@ -74,6 +74,10 @@ Note: flagged weaknesses are NOT stored in the database. They are collected in-m
 |--------|------|-------------|
 | `id` | UUID (PK) | Auto-generated report ID |
 | `sessionId` | UUID (FK → sessions.id) | Parent session (cascade delete) |
+| `overallScore` | Integer (0–100) | Weighted aggregate score for the full interview |
+| `correctnessScore` | Integer (0–100) | Accuracy and completeness of solutions / answers |
+| `complexityScore` | Integer (0–100) | Time & space complexity analysis depth |
+| `communicationScore` | Integer (0–100) | Clarity, structure, and articulation quality |
 | `correctnessNotes` | Text | Assessment of solution correctness |
 | `complexityNotes` | Text | Assessment of time/space complexity awareness |
 | `communicationNotes` | Text | Assessment of communication clarity |
@@ -171,13 +175,24 @@ GET / (iq_session cookie present)
   └─> Reuse for all subsequent queries
 ```
 
-## Data Retention & Privacy
+## Data Retention, Privacy & Legal
 
-- **No Personal Data**: No names, emails, or identifying information collected
-- **No Tracking**: Cookie is the only tracking mechanism
-- **Session Lifetime**: Sessions stored indefinitely (no auto-deletion)
-- **Cookie Lifetime**: 1 year, then refreshes on next visit
-- **GDPR Compliant**: Anonymous, no personal data to collect
+This section documents how InterviewIQ handles data. It does not constitute legal advice; operators should obtain independent legal review for their jurisdiction.
+
+- **Collected Data**: A pseudonymous UUID cookie (`iq_session`, 1-year max-age, httpOnly, sameSite=lax) stored in the visitor's browser. Interview transcripts and feedback reports are stored server-side keyed to this UUID. No name, email, or direct identifier is collected.
+- **Legal Classification**: The UUID cookie and linked session data may constitute **personal data** under regulations such as GDPR (Article 4(1)) or similar frameworks, because it distinguishes a specific browser/device over time. Pseudonymisation reduces but does not eliminate privacy obligations.
+- **Cookie Lifetime**: 1 year; extends on each visit via `maxAge`. Visitors can clear it via browser settings, which breaks continuity but does not delete server-side data.
+- **Retention**: Sessions and feedback are stored indefinitely (no auto-deletion). There is currently no user-facing data deletion mechanism.
+- **Required Controls** (not yet implemented):
+  - Data deletion request endpoint (right to erasure / "right to be forgotten")
+  - Data access / portability endpoint (right of access)
+  - Cookie consent banner (if governed by ePrivacy Directive / GDPR)
+  - Automated purge of sessions older than a configurable retention window
+- **Legal Review**: Before production deployment, operators should confirm:
+  - Whether a Data Protection Impact Assessment (DPIA) is needed
+  - Whether a lawful basis for processing exists (e.g. legitimate interests, consent)
+  - Whether cookie consent is required under local ePrivacy rules
+  - Whether international transfer safeguards apply (if operators or cloud providers are outside the visitor's jurisdiction)
 
 ## Typical Session Sizes
 

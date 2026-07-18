@@ -134,7 +134,7 @@ All AI calls wrapped in:
 **Drizzle ORM schema** with tables:
 - `sessions` — interview metadata (id, sessionId, role, difficulty, status, createdAt)
 - `transcript_events` — individual messages (id, sessionId, role, content, createdAt)
-- `feedback_reports` — final report (id, sessionId, correctnessNotes, complexityNotes, communicationNotes, quotedMoments, nextSteps, createdAt)
+- `feedback_reports` — final report (id, sessionId, overallScore, correctnessScore, complexityScore, communicationScore, correctnessNotes, complexityNotes, communicationNotes, quotedMoments, nextSteps, createdAt)
 
 **Queries via serverless HTTP driver** (Neon) — no persistent connections needed.
 

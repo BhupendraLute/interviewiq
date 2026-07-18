@@ -33,11 +33,21 @@ export default function CreateInterviewPage() {
     setError("");
 
     try {
-      const { sessionId } = await createSession({
+      const { sessionId, question } = await createSession({
         role: role.trim(),
         difficulty: difficulty as "easy" | "medium" | "hard",
         mode,
       });
+      sessionStorage.setItem(
+        `iq_session_${sessionId}`,
+        JSON.stringify({
+          messages: [{ id: crypto.randomUUID(), role: "assistant", content: question.prompt }],
+          mode,
+          flagged: [],
+          editorCode: "",
+          editorLanguage: "javascript",
+        })
+      );
       router.push(`/interview/${sessionId}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to start interview");

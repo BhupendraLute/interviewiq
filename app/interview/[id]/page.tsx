@@ -171,12 +171,16 @@ export default function InterviewSessionPage({
 
   const controllerRef = useRef<PromptInputControllerProps | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const submitTranscriptRef = useRef<(text: string) => void>(() => {});
 
   const { sttSupported, ttsSupported, listening, speaking, startListening, stopListening, speak, cancelSpeaking } =
     useSpeech({
       lang: voiceLang,
       onInterimTranscript: (transcript) => {
         controllerRef.current?.textInput.setInput(transcript);
+      },
+      onFinalTranscript: (transcript) => {
+        submitTranscriptRef.current(transcript);
       },
     });
 
@@ -281,6 +285,10 @@ export default function InterviewSessionPage({
     [sessionId, mode, isResponding, autoSpeak, speak]
   );
 
+  useEffect(() => {
+    submitTranscriptRef.current = handleSubmit;
+  }, [handleSubmit]);
+
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -306,12 +314,10 @@ export default function InterviewSessionPage({
   const handleMic = useCallback(() => {
     if (listening) {
       stopListening();
-      const text = controllerRef.current?.textInput.value?.trim();
-      if (text) handleSubmit(text);
     } else {
       startListening();
     }
-  }, [listening, stopListening, startListening, handleSubmit]);
+  }, [listening, stopListening, startListening]);
 
   const dismissHint = useCallback(() => {
     setHintDismissed(true);
