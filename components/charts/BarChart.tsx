@@ -9,6 +9,7 @@ import {
   Title,
   Tooltip,
   Legend,
+  type TooltipItem,
 } from "chart.js";
 import { useSyncExternalStore } from "react";
 
@@ -71,7 +72,7 @@ export default function BarChart<T extends Record<string, number>>({
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: (context: { raw: number }) => `${context.raw}/100`,
+          label: (context: TooltipItem<"bar">) => `${Number(context.raw)}/100`,
         },
       },
     },
@@ -91,7 +92,7 @@ export default function BarChart<T extends Record<string, number>>({
       x: {
         ticks: {
           color: labelColor,
-          font: { size: 11, weight: "500" as const },
+          font: { size: 11, weight: 500 },
         },
         grid: {
           display: false,
