@@ -39,8 +39,8 @@ export default function CreateInterviewPage() {
         mode,
       });
       router.push(`/interview/${sessionId}`);
-    } catch (err: any) {
-      setError(err.message ?? "Failed to start interview");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to start interview");
       setLoading(false);
     }
   };
@@ -105,7 +105,10 @@ export default function CreateInterviewPage() {
 
           <Button type="submit" className="w-full gap-2" disabled={loading}>
             {loading ? (
-              <span className="animate-pulse">Starting interview...</span>
+              <>
+                <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Starting interview…
+              </>
             ) : (
               <>
                 <SparklesIcon className="size-4" />

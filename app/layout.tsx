@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Header from "@/components/navigation/Header";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 
@@ -17,10 +18,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("h-full antialiased", "font-sans", geist.variable)} data-scroll-behavior="smooth">
+    <html lang="en" className={cn("h-full antialiased", "font-sans", geist.variable)} data-scroll-behavior="smooth" suppressHydrationWarning>
       <body className="min-h-full flex flex-col font-sans">
-        <Header />
-        {children}
+        <ThemeProvider>
+          <Header />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

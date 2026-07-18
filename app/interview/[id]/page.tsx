@@ -153,6 +153,7 @@ export default function InterviewSessionPage({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isResponding, setIsResponding] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
   const [mode, setMode] = useState<InterviewMode>("coding");
   const [flaggedWeaknesses, setFlaggedWeaknesses] = useState<
     { topic: string; note: string }[]
@@ -286,7 +287,8 @@ export default function InterviewSessionPage({
   }, []);
 
   const handleFinish = useCallback(async () => {
-    if (!sessionId) return;
+    if (!sessionId || isFinishing) return;
+    setIsFinishing(true);
     try {
       await finishSession(sessionId);
       sessionStorage.removeItem(`iq_session_${sessionId}`);
@@ -294,7 +296,7 @@ export default function InterviewSessionPage({
     } catch {
       router.push(`/interview/${sessionId}/report`);
     }
-  }, [sessionId, router]);
+  }, [sessionId, router, isFinishing]);
 
   const handleSuggestion = useCallback(
     (suggestion: string) => handleSubmit(suggestion),
@@ -354,7 +356,19 @@ export default function InterviewSessionPage({
   }
 
   return (
-    <main className="flex flex-col h-[calc(100vh-4rem)] w-full shrink-0 overflow-hidden">
+    <main className="relative flex flex-col h-[calc(100vh-4rem)] w-full shrink-0 overflow-hidden">
+      {/* Finishing overlay */}
+      {isFinishing && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-background/80 backdrop-blur-sm">
+          <span className="size-10 animate-spin rounded-full border-[3px] border-indigo-600 border-t-transparent" />
+          <p className="text-sm font-medium text-muted-foreground">
+            Generating your feedback report…
+          </p>
+          <p className="max-w-xs text-center text-xs text-muted-foreground/60">
+            Analyzing your transcript, scoring each dimension, and preparing actionable insights.
+          </p>
+        </div>
+      )}
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
@@ -418,11 +432,15 @@ export default function InterviewSessionPage({
             variant="outline"
             size="sm"
             onClick={handleFinish}
-            disabled={isResponding}
+            disabled={isResponding || isFinishing}
             className="gap-1.5"
           >
-            <SquareIcon className="size-3.5" />
-            <span className="hidden sm:inline">End</span>
+            {isFinishing ? (
+              <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <SquareIcon className="size-3.5" />
+            )}
+            <span className="hidden sm:inline">{isFinishing ? "Finishing…" : "End"}</span>
           </Button>
         </div>
       </div>

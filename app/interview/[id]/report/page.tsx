@@ -134,8 +134,33 @@ export default function ReportPage({
 
   if (loading) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <Shimmer>Generating your feedback report...</Shimmer>
+      <main className="flex-1 px-4 py-8 md:px-6 md:py-12">
+        <div className="mx-auto max-w-5xl space-y-8 animate-in fade-in duration-500">
+          <div className="text-center space-y-3">
+            <div className="mx-auto size-14 rounded-2xl bg-muted animate-pulse" />
+            <div className="mx-auto h-8 w-48 rounded-lg bg-muted animate-pulse" />
+            <div className="mx-auto h-4 w-72 rounded bg-muted/60 animate-pulse" />
+          </div>
+          <div className="rounded-2xl border bg-card p-8 shadow-sm">
+            <div className="flex items-center justify-center gap-8">
+              <div className="size-40 rounded-full bg-muted animate-pulse" />
+              <div className="space-y-3 flex-1 max-w-xs">
+                <div className="h-4 w-full rounded bg-muted animate-pulse" />
+                <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
+                <div className="h-4 w-1/2 rounded bg-muted animate-pulse" />
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="aspect-square rounded-xl bg-muted animate-pulse" />
+            <div className="aspect-square rounded-xl bg-muted animate-pulse" />
+          </div>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-32 rounded-xl bg-muted animate-pulse" />
+            ))}
+          </div>
+        </div>
       </main>
     );
   }
@@ -167,10 +192,12 @@ export default function ReportPage({
   };
 
   return (
-    <main className="flex-1 px-4 py-8 md:px-6 md:py-12">
+    <main className="relative flex-1 overflow-hidden px-4 py-8 md:px-6 md:py-12">
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-indigo-50/40 via-transparent to-transparent dark:from-indigo-950/20" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-violet-50/30 via-transparent to-transparent dark:from-violet-950/10" />
       <div className="mx-auto max-w-5xl space-y-8">
         {/* Header */}
-        <div className="text-center space-y-3">
+        <div className="text-center space-y-3 animate-in fade-in slide-in-from-top-4 duration-700">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/20">
             <CheckCircleIcon className="size-7 text-white" />
           </div>
@@ -183,7 +210,7 @@ export default function ReportPage({
         </div>
 
         {/* Overall Score Hero */}
-        <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-card to-muted/30 p-8 shadow-sm">
+        <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-card to-muted/30 p-8 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100 fill-mode-both">
           <div className="absolute top-0 right-0 -mr-16 -mt-16 size-48 rounded-full bg-indigo-500/5 blur-3xl" />
           <div className="absolute bottom-0 left-0 -ml-16 -mb-16 size-48 rounded-full from-violet-500/5 blur-3xl" />
           <div className="relative grid items-center gap-8 md:grid-cols-[1fr_auto_1fr]">
@@ -212,14 +239,14 @@ export default function ReportPage({
         </div>
 
         {/* Charts Grid */}
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200 fill-mode-both">
           {/* Radar Chart */}
           <div className="rounded-xl border bg-card p-6 shadow-sm">
             <div className="mb-4 flex items-center gap-2">
               <TrendingUpIcon className="size-4 text-indigo-600" />
               <h2 className="font-semibold text-sm">Skill Profile</h2>
             </div>
-            <div className="aspect-square max-h-72">
+            <div className="h-64">
               <RadarChart
                 data={[chartData]}
                 keys={["correctness", "complexity", "communication"]}
@@ -233,7 +260,7 @@ export default function ReportPage({
               <RefreshCwIcon className="size-4 text-indigo-600" />
               <h2 className="font-semibold text-sm">Dimension Comparison</h2>
             </div>
-            <div className="aspect-square max-h-72">
+            <div className="h-64">
               <BarChart
                 data={[chartData]}
                 keys={["correctness", "complexity", "communication"]}
@@ -243,7 +270,7 @@ export default function ReportPage({
         </div>
 
         {/* Detailed Notes */}
-        <div className="space-y-4">
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300 fill-mode-both">
           <div className="flex items-center gap-2">
             <TargetIcon className="size-4 text-muted-foreground" />
             <h2 className="font-semibold text-sm text-muted-foreground">Dimension Analysis</h2>
@@ -343,7 +370,7 @@ export default function ReportPage({
 
         {/* Key Moments */}
         {report.quotedMoments?.length > 0 && (
-          <section className="space-y-4">
+          <section className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500 fill-mode-both">
             <div className="flex items-center gap-2">
               <QuoteIcon className="size-4 text-muted-foreground" />
               <h2 className="font-semibold text-sm text-muted-foreground">Key Moments</h2>
@@ -375,7 +402,7 @@ export default function ReportPage({
         )}
 
         {/* Next Steps */}
-        <section className="rounded-xl border bg-gradient-to-br from-emerald-50/80 to-card p-6 shadow-sm dark:from-emerald-950/10">
+        <section className="rounded-xl border bg-gradient-to-br from-emerald-50/80 to-card p-6 shadow-sm dark:from-emerald-950/10 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-700 fill-mode-both">
           <div className="mb-3 flex items-center gap-2">
             <ArrowRightIcon className="size-4 text-emerald-600" />
             <h2 className="font-semibold text-sm">Next Steps</h2>
