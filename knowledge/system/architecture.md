@@ -152,12 +152,14 @@ POST /api/session/start
 ## Request Flow: Send Response
 
 ```
-POST /api/session/[id]/respond
+POST /api/session/[id]/respond  { message, mode }
 │
 ├─> Insert user message into transcript_events
 ├─> Load full transcript (all history)
+├─> Load session metadata (role, difficulty)
 ├─> Detect if answer contains code (looksLikeCode)
-├─> Create InterviewerAgent instance (mode-aware)
+├─> Create InterviewerAgent instance (role-aware, difficulty-aware, mode-aware)
+│   └─> flagged array is reset per provider attempt inside factory callback
 ├─> Agent reads transcript, calls flag_weakness if needed
 ├─> Insert agent reply into transcript_events
 └─> Return agent response + any flagged weaknesses + provider
@@ -166,13 +168,14 @@ POST /api/session/[id]/respond
 ## Request Flow: Finish Interview
 
 ```
-POST /api/session/[id]/finish
+POST /api/session/[id]/finish  { mode: "coding" | "system-design" | "behavioral" }
 │
-├─> Mark session as completed (status = "completed")
+├─> Load session metadata (role, difficulty)
 ├─> Load full transcript
-├─> Create FeedbackAgent instance
-├─> Agent reads full transcript via structured output
+├─> Create FeedbackAgent instance (role-aware, difficulty-aware, mode-aware)
+├─> Agent generates structured report via Zod output
 ├─> INSERT feedback_reports into DB
+├─> Mark session as completed (status = "completed")
 └─> Return report + provider
 ```
 
@@ -188,19 +191,25 @@ POST /api/session/[id]/finish
 
 ```
 components/
-├── navigation/
+├── layout/                     — App layout components
 │   └── Header.tsx              — App header with brand + "New Interview" CTA
-├── ai-elements/                — AI conversation UI components
+├── chat/                       — AI conversation UI components
 │   ├── conversation.tsx        — Scrollable conversation container
 │   ├── message.tsx             — Chat message with role-based styling
 │   ├── prompt-input.tsx        — Text input with submit button
 │   ├── suggestion.tsx          — Clickable suggestion chips
 │   └── shimmer.tsx             — Loading shimmer animation
+├── interview/                  — Interview-specific tools
+│   ├── CodeEditor.tsx          — CodeMirror-based code editor
+│   └── Whiteboard.tsx          — Drawing whiteboard for system design
 ├── feedback/
 │   └── Toast.tsx               — Auto-dismiss notification (success/error/info)
 ├── charts/
 │   ├── BarChart.tsx            — Chart.js bar chart for skill breakdown
 │   └── RadarChart.tsx          — Chart.js radar chart for performance overview
+├── theme/
+│   ├── ThemeProvider.tsx       — Next.js themes provider
+│   └── ThemeToggle.tsx         — Dark/light mode toggle
 └── ui/                         — shadcn/ui base components (25+ components)
     ├── accordion.tsx, alert.tsx, avatar.tsx, badge.tsx
     ├── button.tsx, button-group.tsx, card.tsx, carousel.tsx
@@ -209,6 +218,22 @@ components/
     ├── progress.tsx, scroll-area.tsx, select.tsx, separator.tsx
     ├── spinner.tsx, switch.tsx, tabs.tsx, textarea.tsx, tooltip.tsx
     └── ... (base-nova style via shadcn CLI)
+```
+
+## Custom Hooks
+
+```
+hooks/
+├── useInterviewSession.ts      — Main interview logic (messages, speech, submission, state)
+└── useSpeech.ts                — Speech-to-text & text-to-speech via Web Speech API
+```
+
+## Shared Types
+
+```
+lib/
+└── interview/
+    └── types.ts                — ChatMessage, PanelTab, MobileView, extractCodeBlock, mapLang, VOICE_LANGS
 ```
 
 ## Deployment

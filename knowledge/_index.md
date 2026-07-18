@@ -68,10 +68,12 @@ How InterviewIQ works from a user and developer perspective.
 1. **Interviewer Agent** — listens to your answer, calls `flag_weakness` when it spots a gap, asks sharp follow-ups; adapts its behavior to coding, system-design, or behavioral mode
 2. **Feedback Agent** — reads the full transcript, produces a Zod-validated structured report with correctness, complexity, communication notes, quoted moments, and next steps
 
-**Fallback Model Architecture**: All AI calls are wrapped in a fallback strategy:
+**Fallback Model Architecture**: All AI calls are wrapped in a three-tier fallback strategy:
 - Try OpenAI first (`gpt-4o-mini`)
 - Backoff + retry on rate limiting
 - Automatic fallback to OpenRouter (`meta-llama/llama-3.1-8b-instruct:free`) on quota exhausted or auth failures
+- Last resort fallback to OpenCode Zen (`big-pickle`, free)
+- The `flagged` array is reset per provider attempt inside the factory callback
 
 **Anonymous-First**: No user table, no login. First visit gets a UUID cookie; all data is tied to that cookie.
 

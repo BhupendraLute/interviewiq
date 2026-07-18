@@ -64,7 +64,7 @@ interviewiq/
 │   ├── interview/
 │   │   ├── create/page.tsx          # Interview config form (role, difficulty, mode)
 │   │   └── [id]/
-│   │       ├── page.tsx             # Live interview chat with AI conversation UI
+│   │       ├── page.tsx             # Live interview chat (pure UI, logic in hook)
 │   │       └── report/page.tsx      # Feedback report (API-driven, structured output)
 │   └── api/
 │       ├── session/
@@ -76,25 +76,37 @@ interviewiq/
 │       └── test-session/route.ts    # GET /api/test-session
 │
 ├── components/                      # UI components
-│   ├── navigation/
-│   │   └── Header.tsx               # App header
-│   ├── ai-elements/                 # AI conversation UI
+│   ├── layout/
+│   │   └── Header.tsx               # App header with brand + CTA
+│   ├── chat/                        # AI conversation UI
 │   │   ├── conversation.tsx         # Scrollable conversation container
 │   │   ├── message.tsx              # Chat message with role styling
 │   │   ├── prompt-input.tsx         # Text input with submit
 │   │   ├── suggestion.tsx           # Clickable suggestion chips
 │   │   └── shimmer.tsx              # Loading animation
+│   ├── interview/
+│   │   ├── CodeEditor.tsx           # CodeMirror-based code editor
+│   │   └── Whiteboard.tsx           # Drawing whiteboard for system design
 │   ├── feedback/
 │   │   └── Toast.tsx                # Auto-dismiss notification
 │   ├── charts/
 │   │   ├── BarChart.tsx             # Chart.js bar chart
 │   │   └── RadarChart.tsx           # Chart.js radar chart
+│   ├── theme/
+│   │   ├── ThemeProvider.tsx        # Next.js themes provider
+│   │   └── ThemeToggle.tsx          # Dark/light mode toggle
 │   └── ui/                          # shadcn/ui components (25+)
 │       ├── button.tsx, card.tsx, input.tsx, select.tsx
 │       ├── dialog.tsx, tabs.tsx, badge.tsx, tooltip.tsx
 │       └── ... (base-nova style via shadcn CLI)
 │
+├── hooks/                           # Custom React hooks
+│   ├── useInterviewSession.ts       # Interview logic (messages, speech, submission, state)
+│   └── useSpeech.ts                 # Speech-to-text & TTS via Web Speech API
+│
 ├── lib/                             # Core logic
+│   ├── interview/
+│   │   └── types.ts                 # ChatMessage, PanelTab, MobileView, helpers
 │   ├── questions.ts                 # Question bank (10 built-in) + CSV/JSON import
 │   ├── session.ts                   # Anonymous session management (UUID cookie)
 │   ├── callModel.ts                 # Raw OpenAI/OpenRouter/OpenCode Zen chat completions
@@ -146,16 +158,18 @@ const anonId = await getOrCreateAnonId();
 Every interview uses real agents with tool calling:
 
 ```typescript
-// Interviewer Agent (real-time, mode-aware)
-const agent = makeInterviewerAgent(model, collected, "coding", false);
+// Interviewer Agent (real-time, mode + role + difficulty aware)
 const { finalOutput, provider } = await runAgentWithFallback(
-  (model) => makeInterviewerAgent(model, flagged, mode, isCodeAnswer),
+  (model) => {
+    flagged.length = 0; // Reset per provider attempt
+    return makeInterviewerAgent(model, flagged, mode, isCodeAnswer, role, difficulty);
+  },
   transcript
 );
 
-// Feedback Agent (at end)
+// Feedback Agent (at end, role + difficulty + mode aware)
 const { finalOutput, provider } = await runAgentWithFallback<FeedbackReport>(
-  (model) => makeFeedbackAgent(model),
+  (model) => makeFeedbackAgent(model, role, difficulty, interviewMode),
   formattedTranscript
 );
 ```
@@ -269,11 +283,18 @@ export async function GET() { ... }
 ### UI Components
 
 All in `components/`:
-- **Header** — navigation bar with brand link and "New Interview" CTA
-- **AI Elements** — `Conversation`, `Message`, `PromptInput`, `Suggestion`, `Shimmer` for the interview chat UI
-- **shadcn/ui** — 25+ base components (Button, Card, Input, Select, Dialog, Tabs, Badge, Tooltip, etc.) in base-nova style
-- **Toast** — auto-dismiss notification (5s)
-- **BarChart/RadarChart** — Chart.js wrappers for feedback display
+- **Header** (`layout/`) — navigation bar with brand link and "New Interview" CTA
+- **Chat** (`chat/`) — `Conversation`, `Message`, `PromptInput`, `Suggestion`, `Shimmer` for the interview chat UI
+- **Tools** (`interview/`) — `CodeEditor` (CodeMirror), `Whiteboard` (drawing for system design)
+- **shadcn/ui** (`ui/`) — 25+ base components (Button, Card, Input, Select, Dialog, Tabs, Badge, Tooltip, etc.) in base-nova style
+- **Theme** (`theme/`) — `ThemeProvider`, `ThemeToggle` for dark/light mode
+- **Charts** (`charts/`) — `BarChart`, `RadarChart` for feedback display
+
+### Custom Hooks
+
+All in `hooks/`:
+- `useInterviewSession.ts` — encapsulates all interview logic (messages, speech integration, submission, keyboard shortcuts, session persistence). Returns state + handlers for the page component.
+- `useSpeech.ts` — Web Speech API hook for speech-to-text and text-to-speech.
 
 ---
 
