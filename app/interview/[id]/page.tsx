@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, use } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { respond, finishSession, type InterviewMode } from "@/lib/api";
@@ -148,8 +148,8 @@ export default function InterviewSessionPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { id: sessionId } = use(params);
   const router = useRouter();
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isResponding, setIsResponding] = useState(false);
@@ -185,29 +185,24 @@ export default function InterviewSessionPage({
     });
 
   useEffect(() => {
-    const init = async () => {
-      const { id } = await params;
-      setSessionId(id);
-      const stored = sessionStorage.getItem(`iq_session_${id}`);
-      let resolvedMode: InterviewMode = "coding";
-      if (stored) {
-        const data = JSON.parse(stored);
-        setMessages(data.messages ?? []);
-        resolvedMode = data.mode ?? "coding";
-        setMode(resolvedMode);
-        setFlaggedWeaknesses(data.flagged ?? []);
-        setEditorCode(data.editorCode ?? "");
-        setEditorLanguage(data.editorLanguage ?? "javascript");
-      }
-      // Mode-aware default workspace: whiteboard leads for system design,
-      // behavioral interviews keep the chat full-width by default.
-      setPanelTab(resolvedMode === "system-design" ? "whiteboard" : "code");
-      setPanelOpen(resolvedMode !== "behavioral");
-      setHintDismissed(sessionStorage.getItem("iq_hint_seen") === "1");
-      setIsLoading(false);
-    };
-    init();
-  }, [params]);
+    const stored = sessionStorage.getItem(`iq_session_${sessionId}`);
+    let resolvedMode: InterviewMode = "coding";
+    if (stored) {
+      const data = JSON.parse(stored);
+      setMessages(data.messages ?? []);
+      resolvedMode = data.mode ?? "coding";
+      setMode(resolvedMode);
+      setFlaggedWeaknesses(data.flagged ?? []);
+      setEditorCode(data.editorCode ?? "");
+      setEditorLanguage(data.editorLanguage ?? "javascript");
+    }
+    // Mode-aware default workspace: whiteboard leads for system design,
+    // behavioral interviews keep the chat full-width by default.
+    setPanelTab(resolvedMode === "system-design" ? "whiteboard" : "code");
+    setPanelOpen(resolvedMode !== "behavioral");
+    setHintDismissed(sessionStorage.getItem("iq_hint_seen") === "1");
+    setIsLoading(false);
+  }, [sessionId]);
 
   useEffect(() => {
     if (sessionId && messages.length > 0) {
@@ -743,7 +738,7 @@ export default function InterviewSessionPage({
         {/* Tools panel */}
         <aside
           className={cn(
-            "flex min-h-0 min-w-0 flex-col border-border bg-background lg:w-[44%] lg:max-w-[680px] lg:min-w-[380px] lg:shrink-0",
+            "flex min-h-0 min-w-0 flex-col border-border bg-background lg:w-[44%] lg:max-w-170 lg:min-w-95 lg:shrink-0",
             panelOpen ? "lg:flex lg:border-l" : "lg:hidden",
             mobileView === "chat" ? "max-lg:hidden" : "max-lg:flex max-lg:flex-1"
           )}

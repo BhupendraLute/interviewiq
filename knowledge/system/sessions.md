@@ -36,10 +36,10 @@ A **session** in InterviewIQ represents one complete mock interview from start t
        ▼
 ┌──────────────────────────────────────┐
 │  FINISH INTERVIEW                    │
-│  • Session status → "completed"      │
 │  • Feedback agent reads transcript   │
 │  • Structured report generated       │
-│  • Session marked complete           │
+│  • Feedback report persisted to DB   │
+│  • Session status → "completed"      │
 └──────────────────────────────────────┘
 ```
 
@@ -130,9 +130,16 @@ await db.insert(transcriptEvents).values({ sessionId, role: "user", content: mes
 await db.select().from(feedbackReports).where(eq(feedbackReports.sessionId, sessionId));
 ```
 
-### 6. Mark Session as Completed
+### 6. Finish Session (Generate Feedback First, Then Mark Complete)
+
+Feedback generation runs BEFORE the status update so a failure leaves the session in "in_progress" for retry.
 
 ```typescript
+// 1. Generate and persist feedback report
+const report = await runAgentWithFallback<FeedbackReport>(...);
+await db.insert(feedbackReports).values({ sessionId, ...report });
+
+// 2. Then mark session as completed
 await db.update(sessions).set({ status: "completed" }).where(eq(sessions.id, sessionId));
 ```
 
@@ -157,12 +164,17 @@ await db.select().from(sessions).where(eq(sessions.sessionId, anonId)).orderBy(d
 ### First Visit Flow
 
 ```
-GET / (no iq_session cookie)
+User submits /interview/create form (no iq_session cookie)
   │
-  ├─> getOrCreateAnonId() called
-  ├─> Generate UUID via crypto.randomUUID()
-  ├─> Set httpOnly cookie
-  └─> Return to user with cookie set
+  └─> POST /api/session/start
+        │
+        ├─> getOrCreateAnonId() called
+        │     ├─> Generate UUID via crypto.randomUUID()
+        │     └─> Set httpOnly cookie (iq_session)
+        │
+        ├─> Insert session row (sessions.sessionId = anonId)
+        ├─> Pick question, insert initial transcript event
+        └─> Return { sessionId, question } to client
 ```
 
 ### Subsequent Visits
@@ -179,16 +191,17 @@ GET / (iq_session cookie present)
 
 This section documents how InterviewIQ handles data. It does not constitute legal advice; operators should obtain independent legal review for their jurisdiction.
 
-- **Collected Data**: A pseudonymous UUID cookie (`iq_session`, 1-year max-age, httpOnly, sameSite=lax) stored in the visitor's browser. Interview transcripts and feedback reports are stored server-side keyed to this UUID. No name, email, or direct identifier is collected.
+- **Collected Data**: A pseudonymous UUID cookie (`iq_session`, 1-year max-age, httpOnly, sameSite=lax) stored in the visitor's browser. The cookie UUID is stored in `sessions.sessionId`. Related transcripts (`transcript_events`) and feedback reports (`feedback_reports`) reference `sessions.id` via foreign key — they are reached by joining through the `sessions` table, not by matching the cookie UUID directly. No name, email, or direct identifier is collected.
 - **Legal Classification**: The UUID cookie and linked session data may constitute **personal data** under regulations such as GDPR (Article 4(1)) or similar frameworks, because it distinguishes a specific browser/device over time. Pseudonymisation reduces but does not eliminate privacy obligations.
 - **Cookie Lifetime**: 1 year; extends on each visit via `maxAge`. Visitors can clear it via browser settings, which breaks continuity but does not delete server-side data.
-- **Retention**: Sessions and feedback are stored indefinitely (no auto-deletion). There is currently no user-facing data deletion mechanism.
-- **Required Controls** (not yet implemented):
-  - Data deletion request endpoint (right to erasure / "right to be forgotten")
-  - Data access / portability endpoint (right of access)
-  - Cookie consent banner (if governed by ePrivacy Directive / GDPR)
-  - Automated purge of sessions older than a configurable retention window
-- **Legal Review**: Before production deployment, operators should confirm:
+- **Retention**: Sessions and feedback are stored indefinitely (no auto-deletion). There is no user-facing data deletion mechanism.
+- **Production Deployment Blocked**: This project MUST NOT be deployed to production serving real users until:
+  - A data deletion / erasure endpoint is implemented
+  - A data access / portability endpoint is implemented
+  - A cookie consent banner is implemented (if governed by ePrivacy Directive / GDPR)
+  - Automated purge of sessions older than a configurable retention window is implemented
+  - An approved data retention and legal plan exists
+- **Legal Review**: Operators should confirm:
   - Whether a Data Protection Impact Assessment (DPIA) is needed
   - Whether a lawful basis for processing exists (e.g. legitimate interests, consent)
   - Whether cookie consent is required under local ePrivacy rules

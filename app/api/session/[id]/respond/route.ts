@@ -51,7 +51,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const interviewMode = (mode as InterviewMode | undefined) ?? "coding";
     const isCodeAnswer = looksLikeCode(message);
     const { finalOutput, provider } = await runAgentWithFallback<string>(
-      (model) => makeInterviewerAgent(model, flagged, interviewMode, isCodeAnswer, role, difficulty),
+      (model) => {
+        flagged.length = 0;
+        return makeInterviewerAgent(model, flagged, interviewMode, isCodeAnswer, role, difficulty);
+      },
       agentInput as any
     );
 
