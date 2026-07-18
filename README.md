@@ -425,3 +425,7 @@ knowledge/agents/             → interviewer-agent, feedback-agent
 knowledge/questions/          → question bank (easy/medium/hard)
 knowledge/guides/             → user-guide, developer-guide, api-reference
 ```
+
+## License
+
+MIT — see [LICENSE](./LICENSE).
